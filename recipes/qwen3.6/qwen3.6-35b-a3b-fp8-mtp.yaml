@@ -55,6 +55,13 @@ defaults:
   # Gate 2026-06-11: webserver_ok 10/10, zero path-drift, median run
   # ~125s with caching ON + MTP K=2 (image digest 637e7b32).
   enable_prefix_caching: true
+  # ssm_cache_slots MUST be pinned: the Marconi slot pool is an LRU region and
+  # the built-in default (16) churns under multi-turn agentic load (~4-6 snapshot
+  # saves/turn at 17k ctx) — the fresh tail/leaf checkpoint gets evicted before the
+  # next turn's lookup ("Prefix cache hit: N tokens but no SSM snapshot" → full SSM
+  # recompute, warm TTFT 15s+). Diagnosed 2026-07-02 (webserver_ok gate, snapshot-id
+  # recycling 10/13/13/10 in the serve log). 256 holds a full session comfortably.
+  ssm_cache_slots: 256
   # bf16 lm-head: the 248K-vocab projection stays full-precision (the
   # single largest per-token weight read). Argmax over the vocab is exact.
   lm_head_dtype: bf16
