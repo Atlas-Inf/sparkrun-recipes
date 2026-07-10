@@ -37,7 +37,12 @@ metadata:
     chunks stay full-size at EVERY interval (the old interval=16
     256-token micro-chunking is gone) and warm restores work even at
     interval 0; 16 remains a good default for branchy/partial-prefix
-    reuse.
+    reuse. For DEEP multi-turn conversations (100+ turns) also require
+    atlas#287 (snapshot-eviction fix, merged 2026-07-10, in :dev from
+    2026-07-11): without it the warm-restore anchor freezes and replays
+    up to 18.6k tokens/turn regardless of interval. See the
+    qwen3.6-27b-nvfp4-unsloth-agentic recipe for the validated agentic
+    golden config.
   maintainer: avarok
   category: agent
   model_params: 27B
