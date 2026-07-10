@@ -11,7 +11,7 @@ metadata:
     agentic/tool-calling stack (qwen3_coder parser, tool grammar OFF)
     that the 27B golden config validated end-to-end.
 
-    Pinned to avarok/atlas-gb10:dev built on/after 2026-07-11: it
+    Pinned to avarok/atlas-gb10:dev built on/after 2026-07-10T19:18Z (current :dev — the exact gate-verified binary): it
     carries the SSM snapshot-eviction fix (atlas#287, merged
     2026-07-10). Without #287, deep multi-turn conversations freeze the
     warm-restore anchor and replay up to 18.6k tokens/turn through the
