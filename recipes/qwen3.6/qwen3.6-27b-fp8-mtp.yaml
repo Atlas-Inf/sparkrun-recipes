@@ -1,7 +1,9 @@
 recipe_version: "2"
 model: Qwen/Qwen3.6-27B-FP8
 runtime: atlas
-container: avarok/atlas-gb10:latest
+# :dev, NOT :latest — load-bearing, see description. On :latest this model
+# serves at 5 tok/s no matter what num_drafts says (MTP buys nothing there).
+container: avarok/atlas-gb10:dev
 max_nodes: 1
 
 metadata:
@@ -15,30 +17,36 @@ metadata:
     spark-arena-v2 will be skipped because they exceed max_model_len. Use
     --tp 2 / EP=2 to get the full long-context sweep.
 
-    num_drafts: K=1, MEASURED — and it is worth 3x here, not the usual
-    few percent. avarok/atlas-gb10:dev on a GB10, N=10, single sequence,
-    400-token greedy generation (2026-07-12):
+    TWO settings here are load-bearing and BOTH are required to get more
+    than 5 tok/s: `num_drafts: 1` and `container: :dev`. Either one alone
+    gives you 5. Measured on a GB10, N=10, single sequence, 400-token
+    greedy generation (2026-07-12):
 
-      K=1      15.6 tok/s   <-- optimum
-      K=2       5.0 tok/s
-      no-spec   4.9 tok/s
+      image      no-spec    K=1      K=2
+      :dev        5.0      15.6      5.0     <-- use this, at K=1
+      :latest     4.9       5.0       -
 
-    This recipe previously implied K=2, which is why it "was too slow to
-    complete the benchmark" — at 5 tok/s a long sweep never finishes.
+    So the earlier "too slow to complete the benchmark" report had two
+    causes stacked: this recipe implied K=2, AND it pinned :latest. At
+    5 tok/s a long spark-arena sweep never finishes.
 
-    The 3x is NOT ordinary speculation (K=1 can accept at most 2 tokens
-    per step, a 2x ceiling). Dense-FP8 DECODE is the real problem: it runs
-    the unfused per-projection `w8a16_gemv` path, which is badly
-    memory-bound. At K=1 each step verifies 2 tokens and therefore routes
-    through the batched tensor-core `w8a16_gemm` instead — so the step
-    yields ~2 tokens AND costs less, which is how it clears the 2x
-    ceiling. K=2 loses that: the deeper draft's verify overhead outweighs
-    its acceptance, collapsing back to the GEMV-bound rate.
+    Note what the table says: on :latest, MTP buys NOTHING (5.0 with or
+    without it) — the speculative machinery is present but the win is not.
+    The 3x lives entirely in :dev.
 
-    Implication: the headline number here is capped by a decode-kernel
-    gap, not by the model. A fused FP8 dual-GEMV decode kernel would lift
-    the floor and change these numbers — treat 15.6 as a kernel artifact,
-    not a ceiling.
+    And the 3x is NOT ordinary speculation — K=1 accepts at most 2 tokens
+    per step, a 2x ceiling. Dense-FP8 DECODE is the real bottleneck: it
+    runs the unfused per-projection `w8a16_gemv` path and is badly
+    memory-bound. At K=1 each step verifies 2 tokens and so routes through
+    the batched tensor-core `w8a16_gemm` instead — the step yields ~2
+    tokens AND costs less per token, which is how it clears the 2x
+    ceiling. K=2's deeper verify overhead outweighs its acceptance and
+    collapses back to the GEMV-bound rate.
+
+    Implication: 15.6 tok/s is a kernel artifact, not a model ceiling. A
+    fused FP8 dual-GEMV decode kernel would raise the no-spec floor and
+    change every number in that table. Do not read 15.6 as "this model's
+    speed".
   maintainer: avarok
   category: chat
   model_params: 27B
