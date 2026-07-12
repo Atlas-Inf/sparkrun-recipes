@@ -25,14 +25,22 @@ metadata:
 defaults:
   port: 8888
   host: 0.0.0.0
-  max_model_len: 262144
+  # 60k, not 262144: the full spark-arena-v2 concurrency=10 sweep has to
+  # fit in the KV pool on a single GB10. At 262144 the pool is oversized,
+  # the sweep never completes, and the benchmark stalls out.
+  max_model_len: 60000
   max_batch_size: 2
   max_num_seqs: 2
-  kv_cache_dtype: fp8
-  kv_high_precision_layers: auto
+  # bf16, NOT fp8: FP8/NVFP4 KV breaks dense attention on this model —
+  # request timeouts + CUDA-graph thrash. (`kv_high_precision_layers` is
+  # an fp8-KV knob and is intentionally absent.)
+  kv_cache_dtype: bf16
   gpu_memory_utilization: 0.88
   scheduling_policy: slai
   speculative: true
+  # K=2, as the description states. `speculative: true` alone falls back
+  # to MODEL.toml's default_num_drafts = 1.
+  num_drafts: 2
   mtp_quantization: bf16
   enable_prefix_caching: true
   oom_guard_mb: 1024

@@ -18,14 +18,49 @@ If you're on an older sparkrun release that doesn't ship the reservation yet, ad
 sparkrun registry add https://github.com/Avarok-Cybersecurity/atlas-recipes.git
 ```
 
+### Listing the recipes
+
+The `atlas` registry ships **hidden** in sparkrun's defaults, so a bare `sparkrun list`
+filters its recipes out — even though `sparkrun run @atlas/<recipe>` works, because `run`
+resolves by qualified name and isn't visibility-gated. To see them:
+
+```bash
+sparkrun recipe list --registry atlas    # just the Atlas lineup
+sparkrun list -a                         # everything, including hidden registries
+sparkrun recipe show @atlas/qwen3.6-35b-a3b-nvfp4
+```
+
+`sparkrun search` has the same filter — pass `-a` or `--registry atlas`.
+
+### A note on checkpoints
+
+Recipes reference upstream HuggingFace repos by name, and **upstream can re-quantize a repo
+in place**. That happened on 2026-07-10: `unsloth/Qwen3.6-{27B,35B-A3B}-NVFP4` were re-uploaded
+in a mixed-precision NVFP4/FP8 layout, which no Atlas release could load — every user who
+downloaded fresh hit `Weight '...weight_global_scale' not found in store`, while it kept
+working for anyone with the old snapshot still cached.
+
+The default 27B/35B NVFP4 recipes therefore now track the **`nvidia/*`** checkpoints,
+whose on-disk format has been stable since 2026-05-29. Those are verified end-to-end on a
+GB10 and are what you should use.
+
+There is deliberately **no `-unsloth` recipe right now**. Atlas ≥ atlas#300 loads the
+mixed-precision layout (all layers resolve), but the unsloth checkpoints then fail later
+in model build with `CUDA_ERROR_ILLEGAL_ADDRESS` — a separate defect in the
+mixed-precision compute path. Rather than ship a recipe that does not serve, they are
+omitted until that is fixed.
+
+If a model suddenly fails to build with a missing `weight_global_scale` or a
+`weight_scale` dtype error, you are almost certainly on a newer checkpoint than your Atlas
+image — pull a newer `avarok/atlas-gb10:dev`.
+
 ## Catalogue
 
 | Recipe | Model | Topology | Notes |
 |---|---|---|---|
-| `qwen3.6-35b-a3b-nvfp4` | unsloth/Qwen3.6-35B-A3B-NVFP4 | single | **DEFAULT 35B** — MTP K=2, calibrated fp8 KV (128K), qwen3_coder agentic stack, requires :dev ≥ 2026-07-10 (already live) (atlas#287 warm-TTFT fix) |
-| `qwen3.6-27b-nvfp4` | unsloth/Qwen3.6-27B-NVFP4 | single | **DEFAULT 27B** — gate-verified golden: BFCL 89.59 norm, warm TTFT at llama.cpp parity (median 1403 vs 1431 ms), TPOT 58 vs 86 ms, 1.38x wall; requires :dev ≥ 2026-07-10 (already live) (atlas#287) |
+| `qwen3.6-35b-a3b-nvfp4` | nvidia/Qwen3.6-35B-A3B-NVFP4 | single | **DEFAULT 35B** — MTP K=1 (pinned; 116.5 tok/s), calibrated fp8 KV (128K), qwen3_coder agentic stack; requires :dev ≥ 2026-07-10 (atlas#287) |
+| `qwen3.6-27b-nvfp4` | nvidia/Qwen3.6-27B-NVFP4 | single | **DEFAULT 27B** — dense hybrid SSM+Attn, MTP K=1 (pinned), bf16 KV, qwen3_coder agentic stack; requires :dev ≥ 2026-07-10 (atlas#287) |
 | `qwen3.6-35b-a3b-fp8-mtp` | Qwen/Qwen3.6-35B-A3B-FP8 | single | Flagship FP8 — native FP8, bf16 head + bf16 KV, 64K ctx, MTP K=2, live tool-call streaming |
-| `qwen3.6-35b-a3b-nvfp4-nvidia` | nvidia/Qwen3.6-35B-A3B-NVFP4 | single | nvidia-checkpoint variant, MTP K=2, calibrated fp8 KV (128K), ~157 tok/s |
 | `qwen3.6-35b-a3b-fp8-bf16head` | Qwen/Qwen3.6-35B-A3B-FP8 | single | 32K safe profile of the FP8 flagship (same bf16 head/KV) |
 | `qwen3.6-35b-a3b-fp8-nvfp4head` | Qwen/Qwen3.6-35B-A3B-FP8 | single | nvfp4 lm-head sibling — near-neutral wall, lower VRAM |
 | `qwen3.6-27b-fp8-mtp` | Qwen/Qwen3.6-27B-FP8 | single | Dense hybrid SSM+Attn, MTP K=2, ~15 tok/s |
