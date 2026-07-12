@@ -8,13 +8,37 @@ metadata:
   description: |
     Qwen3.6-27B (dense, native FP8) on the Atlas runtime, with the
     upstream-bundled MTP draft head (mtp.safetensors, FP8 e4m3 linear +
-    BF16 norms) enabled for K=2 speculative decoding. KV stays BF16
-    (FP8/NVFP4 KV breaks dense attention — request timeouts + CUDA
-    graph thrash). max_model_len capped at 60_000 so the full
-    spark-arena-v2 concurrency=10 sweep fits in the KV pool on a
-    single GB10; cells at depth=65535/100000 in spark-arena-v2 will be
-    skipped because they exceed max_model_len. Use --tp 2 / EP=2 to
-    get the full long-context sweep.
+    BF16 norms) enabled at K=1. KV stays BF16 (FP8/NVFP4 KV breaks dense
+    attention — request timeouts + CUDA graph thrash). max_model_len
+    capped at 60_000 so the full spark-arena-v2 concurrency=10 sweep fits
+    in the KV pool on a single GB10; cells at depth=65535/100000 in
+    spark-arena-v2 will be skipped because they exceed max_model_len. Use
+    --tp 2 / EP=2 to get the full long-context sweep.
+
+    num_drafts: K=1, MEASURED — and it is worth 3x here, not the usual
+    few percent. avarok/atlas-gb10:dev on a GB10, N=10, single sequence,
+    400-token greedy generation (2026-07-12):
+
+      K=1      15.6 tok/s   <-- optimum
+      K=2       5.0 tok/s
+      no-spec   4.9 tok/s
+
+    This recipe previously implied K=2, which is why it "was too slow to
+    complete the benchmark" — at 5 tok/s a long sweep never finishes.
+
+    The 3x is NOT ordinary speculation (K=1 can accept at most 2 tokens
+    per step, a 2x ceiling). Dense-FP8 DECODE is the real problem: it runs
+    the unfused per-projection `w8a16_gemv` path, which is badly
+    memory-bound. At K=1 each step verifies 2 tokens and therefore routes
+    through the batched tensor-core `w8a16_gemm` instead — so the step
+    yields ~2 tokens AND costs less, which is how it clears the 2x
+    ceiling. K=2 loses that: the deeper draft's verify overhead outweighs
+    its acceptance, collapsing back to the GEMV-bound rate.
+
+    Implication: the headline number here is capped by a decode-kernel
+    gap, not by the model. A fused FP8 dual-GEMV decode kernel would lift
+    the floor and change these numbers — treat 15.6 as a kernel artifact,
+    not a ceiling.
   maintainer: avarok
   category: chat
   model_params: 27B
@@ -38,9 +62,11 @@ defaults:
   gpu_memory_utilization: 0.88
   scheduling_policy: slai
   speculative: true
-  # K=2, as the description states. `speculative: true` alone falls back
-  # to MODEL.toml's default_num_drafts = 1.
-  num_drafts: 2
+  # K=1, MEASURED (see description): 15.6 tok/s vs 5.0 at K=2 vs 4.9
+  # no-spec, N=10. K=2 is a 3x REGRESSION here — do not raise it.
+  # `speculative: true` alone does not pin a depth; it falls back to
+  # MODEL.toml's default_num_drafts.
+  num_drafts: 1
   mtp_quantization: bf16
   enable_prefix_caching: true
   oom_guard_mb: 1024
