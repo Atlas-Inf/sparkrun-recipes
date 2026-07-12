@@ -44,11 +44,20 @@ The default 27B/35B NVFP4 recipes therefore now track the **`nvidia/*`** checkpo
 whose on-disk format has been stable since 2026-05-29. Those are verified end-to-end on a
 GB10 and are what you should use.
 
-There is deliberately **no `-unsloth` recipe right now**. Atlas ≥ atlas#300 loads the
-mixed-precision layout (all layers resolve), but the unsloth checkpoints then fail later
-in model build with `CUDA_ERROR_ILLEGAL_ADDRESS` — a separate defect in the
-mixed-precision compute path. Rather than ship a recipe that does not serve, they are
-omitted until that is fixed.
+There is deliberately **no `-unsloth` recipe yet**, though the engine now supports those
+checkpoints. Loading the mixed-precision layout took two fixes: atlas#300 (the layer
+weights) and atlas#301 (the FP8 `lm_head`, plus per-row weight scales that were being fed
+to a 128×128 block-scaled kernel — in-bounds, so no crash, just silently wrong logits).
+Both are on `main` and verified on a GB10:
+
+| checkpoint | throughput | correctness |
+|---|---|---|
+| `unsloth/Qwen3.6-27B-NVFP4` | 14.0 tok/s | pass |
+| `unsloth/Qwen3.6-35B-A3B-NVFP4` | 123.4 tok/s | pass |
+
+The recipes land once an `avarok/atlas-gb10:dev` image **carrying atlas#301** is published.
+Until then a recipe pointing at those checkpoints would still fail on the image you'd
+actually pull, and shipping a recipe that does not serve is worse than shipping none.
 
 If a model suddenly fails to build with a missing `weight_global_scale` or a
 `weight_scale` dtype error, you are almost certainly on a newer checkpoint than your Atlas
