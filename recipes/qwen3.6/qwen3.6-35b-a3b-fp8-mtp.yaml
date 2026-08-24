@@ -39,7 +39,7 @@ defaults:
   # 2026-07-18 incl. tool calls. (Old 64K profile: ~109/119.7 GB,
   # 2026-06-09.)
   max_model_len: 262144
-  # max_batch_size 2: REQUIRED until Avarok-Cybersecurity/atlas#110 lands —
+  # max_batch_size 2: REQUIRED until Atlas-Inf/atlas#110 lands —
   # an uncapped batch hits the concurrency>=4 + deep-context CUDA-700 crash
   # (re-confirmed live 2026-06-11 at n_decode=2 + n_prefill=2, ~8.5K ctx).
   # The old warning here against capping (SSM slot-leak on aborted deep

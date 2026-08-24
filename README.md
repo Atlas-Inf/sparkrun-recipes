@@ -1,6 +1,6 @@
 # Atlas Spark recipe registry
 
-Official sparkrun recipes for [Atlas Spark](https://github.com/Avarok-Cybersecurity/atlas) — the pure-Rust LLM inference server for NVIDIA DGX Spark GB10. Recipes target the public `avarok/atlas-gb10:latest` Docker image and the `atlas` runtime in [sparkrun](https://github.com/spark-arena/sparkrun).
+Official sparkrun recipes for [Atlas Spark](https://github.com/Atlas-Inf/atlas) — the pure-Rust LLM inference server for NVIDIA DGX Spark GB10. Recipes target the public `avarok/atlas-gb10:latest` Docker image and the `atlas` runtime in [sparkrun](https://github.com/spark-arena/sparkrun).
 
 ## Usage
 
@@ -15,7 +15,7 @@ sparkrun run @atlas/qwen3.5-122b-a10b-nvfp4-ep2     # 2-node EP=2
 If you're on an older sparkrun release that doesn't ship the reservation yet, add it manually:
 
 ```bash
-sparkrun registry add https://github.com/Avarok-Cybersecurity/atlas-recipes.git
+sparkrun registry add https://github.com/Atlas-Inf/sparkrun-recipes.git
 ```
 
 ### Listing the recipes
@@ -121,10 +121,10 @@ Each recipe carries the production-validated KV/seq/MoE settings drawn from Atla
 ## Related
 
 - Runtime: [`atlas` runtime in sparkrun](https://github.com/spark-arena/sparkrun) (PR #169)
-- Engine: https://github.com/Avarok-Cybersecurity/atlas
+- Engine: https://github.com/Atlas-Inf/atlas
 - Docker image: [`avarok/atlas-gb10`](https://hub.docker.com/r/avarok/atlas-gb10)
-- Discord: [Atlas-Inference](https://atlasinference.io)
+- Discord: [Atlas-Inference](https://atlasinference.dev)
 
 ## License
 
-AGPL-3.0 — see [LICENSE](LICENSE). Matches the upstream [Atlas](https://github.com/Avarok-Cybersecurity/atlas) license.
+AGPL-3.0 — see [LICENSE](LICENSE). Matches the upstream [Atlas](https://github.com/Atlas-Inf/atlas) license.
