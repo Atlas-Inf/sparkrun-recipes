@@ -43,7 +43,7 @@ metadata:
     up to 18.6k tokens/turn regardless of interval. See the
     qwen3.6-27b-nvfp4-unsloth-agentic recipe for the validated agentic
     golden config.
-  maintainer: avarok
+  maintainer: atlas-inf
   category: agent
   model_params: 27B
   model_dtype: nvfp4

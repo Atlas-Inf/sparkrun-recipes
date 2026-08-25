@@ -61,7 +61,7 @@ layout; on anything older they fail with `weight_global_scale not found`.
 
 If a model suddenly fails to build with a missing `weight_global_scale` or a
 `weight_scale` dtype error, you are almost certainly on a newer checkpoint than your Atlas
-image — pull a newer `avarok/atlas-gb10:dev`.
+image — pull a newer `azeezish/atlas-gb10:latest`.
 
 ## Catalogue
 
@@ -122,7 +122,7 @@ Each recipe carries the production-validated KV/seq/MoE settings drawn from Atla
 
 - Runtime: [`atlas` runtime in sparkrun](https://github.com/spark-arena/sparkrun) (PR #169)
 - Engine: https://github.com/Atlas-Inf/atlas
-- Docker image: [`azeezish/atlas-gb10`](https://hub.docker.com/r/azeezish/atlas-gb10)
+- Docker image: [`azeezish/atlas-gb10:latest`](https://hub.docker.com/r/azeezish/atlas-gb10:latest)
 - Website: https://atlasinference.dev
 - Discord: https://discord.com/invite/6vDbKaKrKD
 - X: [@AtlasInference](https://x.com/AtlasInference)

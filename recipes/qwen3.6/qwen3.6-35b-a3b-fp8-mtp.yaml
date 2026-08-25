@@ -23,7 +23,7 @@ metadata:
         blocks), ~105 GB steady-state inside the 107.1 GB budget at 0.88
         util; serve ready in ~35 s (fast-load), coherence + tool-call
         smokes green cross-node.
-  maintainer: avarok
+  maintainer: atlas-inf
   category: agent
   model_params: 35B
   model_dtype: fp8
