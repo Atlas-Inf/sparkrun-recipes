@@ -128,3 +128,7 @@ Each recipe carries the production-validated KV/seq/MoE settings drawn from Atla
 ## License
 
 AGPL-3.0 — see [LICENSE](LICENSE). Matches the upstream [Atlas](https://github.com/Atlas-Inf/atlas) license.
+
+---
+
+<sub><b>Continuity notice.</b> Atlas is continuing. This repository, the <a href="https://github.com/Atlas-Inf">Atlas-Inf</a> GitHub organization, and <a href="https://atlasinference.dev">atlasinference.dev</a> are the replacement official Atlas channels. The existing website and GitHub repository remain disputed Atlas assets that have not been relinquished.</sub>
