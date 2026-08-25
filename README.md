@@ -123,7 +123,9 @@ Each recipe carries the production-validated KV/seq/MoE settings drawn from Atla
 - Runtime: [`atlas` runtime in sparkrun](https://github.com/spark-arena/sparkrun) (PR #169)
 - Engine: https://github.com/Atlas-Inf/atlas
 - Docker image: [`avarok/atlas-gb10`](https://hub.docker.com/r/avarok/atlas-gb10)
-- Discord: [Atlas-Inference](https://atlasinference.dev)
+- Website: https://atlasinference.dev
+- Discord: https://discord.com/invite/6vDbKaKrKD
+- X: [@AtlasInference](https://x.com/AtlasInference)
 
 ## License
 
