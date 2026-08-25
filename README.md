@@ -1,6 +1,6 @@
 # Atlas Spark recipe registry
 
-Official sparkrun recipes for [Atlas Spark](https://github.com/Atlas-Inf/atlas) — the pure-Rust LLM inference server for NVIDIA DGX Spark GB10. Recipes target the public `avarok/atlas-gb10:latest` Docker image and the `atlas` runtime in [sparkrun](https://github.com/spark-arena/sparkrun).
+Official sparkrun recipes for [Atlas Spark](https://github.com/Atlas-Inf/atlas) — the pure-Rust LLM inference server for NVIDIA DGX Spark GB10. Recipes target the public `azeezish/atlas-gb10:latest` Docker image and the `atlas` runtime in [sparkrun](https://github.com/spark-arena/sparkrun).
 
 ## Usage
 
@@ -116,13 +116,13 @@ Each recipe carries the production-validated KV/seq/MoE settings drawn from Atla
 - **Mistral Small 4** enforces `kv_cache_dtype: bf16` — FP8/NVFP4 KV destroys the MLA compressed latent (Atlas alpha-2.8 release announcement).
 - **Qwen3-Coder-Next-FP8** requires `ssm_cache_slots: 0`, `oom_guard_mb: 1024`, and `kv_cache_dtype: bf16`.
 - **122B EP=2** + **MiniMax M2.7 EP=2** carry matching `--speculative` / `--mtp-quantization` flags on both ranks (mismatched flags land MTP verify in the worker's SSM layer with no buffers allocated).
-- **MiniMax M2.7 EP=2** is capped at `max_model_len: 12288` to fit the head's KV budget at `gpu_memory_utilization: 0.90` on the public `avarok/atlas-gb10:latest` image (live-validated 2026-05-08).
+- **MiniMax M2.7 EP=2** is capped at `max_model_len: 12288` to fit the head's KV budget at `gpu_memory_utilization: 0.90` on the public `azeezish/atlas-gb10:latest` image (live-validated 2026-05-08).
 
 ## Related
 
 - Runtime: [`atlas` runtime in sparkrun](https://github.com/spark-arena/sparkrun) (PR #169)
 - Engine: https://github.com/Atlas-Inf/atlas
-- Docker image: [`avarok/atlas-gb10`](https://hub.docker.com/r/avarok/atlas-gb10)
+- Docker image: [`azeezish/atlas-gb10`](https://hub.docker.com/r/azeezish/atlas-gb10)
 - Website: https://atlasinference.dev
 - Discord: https://discord.com/invite/6vDbKaKrKD
 - X: [@AtlasInference](https://x.com/AtlasInference)
