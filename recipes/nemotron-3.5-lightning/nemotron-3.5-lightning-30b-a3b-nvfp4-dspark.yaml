@@ -1,0 +1,74 @@
+recipe_version: "2"
+model: nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4
+runtime: atlas
+container: azeezish/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Nemotron-3.5-Lightning-30B-A3B at NVFP4 with DSpark speculative decoding
+    on a single GB10 (SM121).
+
+    Lightning is the hybrid Mamba-2 + MoE + Attention Nemotron-H backbone
+    (hidden 2688, same as Nano, so it binds the inherited Nano SM121 kernel
+    shadow) plus `num_nextn_predict_layers=1` and `mtp.*` tensors. DSpark is
+    the separate 6-layer `Qwen3DSparkModel` drafter published alongside it:
+    it proposes gamma=4 tokens per step from captured target hidden states
+    over a 1024-token sliding window, and the target verifies them in one
+    batched K=3 step.
+
+    DSpark is NOT `--speculative` (Atlas MTP): the two flags are mutually
+    exclusive. `--dflash` selects the external drafter, and `--num-drafts`
+    is derived from `--dflash-gamma`, never passed by hand. Verified on a
+    GB10: the server logs `num_drafts=3` from `gamma=4`.
+
+    ⚠ The four `dflash*` / `draft_model` keys below are NEW registry surface —
+    no other recipe in this repo uses them, so sparkrun's `atlas` runtime must
+    map them onto `--dflash` / `--draft-model` / `--dflash-gamma` /
+    `--dflash-window-size`. That mapping has NOT been verified from this repo.
+    The equivalent direct invocation, which HAS been run on a GB10, is:
+
+      ATLAS_DFLASH_OPTION_B=1 spark serve <target> \
+        --dflash --draft-model <drafter> \
+        --dflash-gamma 4 --dflash-window-size 1024 \
+        --max-seq-len 32768 --kv-cache-dtype fp8 \
+        --gpu-memory-utilization 0.88 --max-batch-size 8
+
+    `ATLAS_DFLASH_OPTION_B=1` is REQUIRED: the Lightning DSpark product policy
+    (`dflash_head/product_policy.rs::validate`) refuses to start without it,
+    and refuses to start if any DSpark diagnostic toggle is present.
+  maintainer: atlas-inf
+  category: agent
+  model_params: 30B
+  model_dtype: nvfp4
+  quantization: nvfp4
+  kv_dtype: fp8
+
+defaults:
+  port: 8888
+  host: 0.0.0.0
+  max_model_len: 32768
+  kv_cache_dtype: fp8
+  gpu_memory_utilization: 0.88
+  scheduling_policy: slai
+  # DSpark drafter. `dflash: true` maps to `--dflash`; the drafter id falls
+  # through from the target's MODEL.toml [dflash].draft_model when omitted,
+  # but it is pinned here so the recipe is self-describing.
+  dflash: true
+  draft_model: nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4-DSpark
+  # gamma 4 / K=3 is the published Lightning DSpark contract and the shape
+  # the drafter's block attention was trained for. The server CLI default is
+  # 16 (the z-lab DFlash drafters); leaving it unset would silently mis-size
+  # the proposal block.
+  dflash_gamma: 4
+  # The drafter's own SWA window. CLI default is 4096; Lightning's drafter
+  # config declares 1024.
+  dflash_window_size: 1024
+  # Prefix caching is OFF on purpose: the server warns of a community-reported
+  # correctness regression on SM12.x with DFlash (wrong outputs on multi-turn
+  # cache hits). It is not merely a perf knob here.
+  enable_prefix_caching: false
+  # 8 is both the server default and the widest tested decode batch here.
+  max_batch_size: 8
+  ssm_cache_slots: 256
+  oom_guard_mb: 1024
