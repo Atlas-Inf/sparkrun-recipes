@@ -1,0 +1,84 @@
+recipe_version: "2"
+model: RadixArk/Qwen3.8-Flash-Next-NVFP4
+runtime: atlas
+container: azeezish/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Qwen3.8-Flash-Next (`qwen4_exp`) at NVFP4 on a single GB10.
+
+    ⚠️ THIS DOES NOT SERVE YET. Atlas recognises the model type, loads every
+    weight and resolves kernels, but `load_layers` bails: the PLE tower and the
+    hyper-connections have no GPU implementation. This file exists because the
+    parts that ARE settled — which checkpoint, the memory plan, and the one
+    setting without which it cannot load at all — were expensive to establish
+    and should not have to be rediscovered.
+
+    What is verified (2026-08-26, on a GB10):
+
+      * Weight load: 296,347 tensors in 69 s, ~88 GB peak, ~26 GB spare.
+      * Kernel target resolves: (sm_121, qwen3.8-flash-next, nvfp4).
+      * A CPU reference forward produces coherent text from these weights —
+        "The capital of France is" -> "Paris. Paris is a city. Therefore".
+        That is correctness evidence, NOT a serving path: it is scalar,
+        single-threaded, and runs at roughly 90 s/token.
+      * All five layer types match HuggingFace at real weights to between
+        1.6e-7 and 8.0e-7, and a full forward on a reduced checkpoint is
+        token-identical to HF (1.05e-6).
+
+    ── Why NVFP4 and not the FP8 release ─────────────────────────────────
+    `Qwen/Qwen3.8-Flash-Next-FP8` does NOT fit. Its routed experts alone are
+    123.3 GB resident against a GB10's ~119.6 GiB. This repack quantizes only
+    the experts (~68 GB) and leaves the MTP block and backbone BF16, landing at
+    ~83 GB resident.
+
+    ── The n-gram table must NOT be resident ─────────────────────────────
+    41% of this checkpoint is one embedding table: 320,001,536 x 160, 51.2 B
+    parameters, ~52 GB. Loading it puts the pre-flight at 163.64 GB and Atlas
+    refuses. It is a pure row gather — one token touches ~16 rows of 160 bytes,
+    about 2.5 KB — so it is read from disk at use time instead. Measured on
+    this table: 820 us/token fully cold, 8.85 us warm, against decode rates two
+    orders of magnitude slower.
+
+    Atlas does this automatically: `demand_paged_patterns` is derived from
+    `ple_layer_ids`, and the load logs
+
+        Demand-paged (never resident, read by row at use time):
+          [".ple.ple_embedding.ngram_embedding.shard_"]
+
+    Note this is NOT an offload in the llama.cpp sense. A GB10 is coherent
+    unified memory (`Addressing Mode: ATS`) — there is no second pool to move
+    anything to. The table stays on NVMe; only the page cache holds hot rows.
+
+  maintainer: atlas-inf
+  category: agent
+  model_params: 180B
+  active_params: 3B
+  model_dtype: nvfp4
+  quantization: nvfp4
+  kv_dtype: fp8
+
+defaults:
+  port: 8888
+  host: 0.0.0.0
+  # 2048, deliberately. The QSA indexer's block_topk is
+  # indexer_budget / indexer_compress_ratio = 512, and selection takes
+  # min(block_topk, num_complete_blocks) -- so at or below 2051 kv every block
+  # is selected and the indexer is EXACTLY a no-op. Measured against the
+  # reference: 0 tokens masked at 2048, 4 at 2052, 112 at 2064. A first
+  # bring-up at this length is exact, not approximate, and needs no indexer.
+  max_model_len: 2048
+  kv_cache_dtype: fp8
+  # ~83 GB of weights are resident; the KV cache is unusually cheap here (only
+  # 12 full-attention layers, 2 KV heads at head_dim 256), so this leaves ample
+  # room. Raise only with a measurement -- 0.88 on the sibling Lightning recipe
+  # took the box off the network at concurrency 8.
+  gpu_memory_utilization: 0.80
+  max_batch_size: 4
+  enable_prefix_caching: false
+  # MTP exists in the checkpoint but is not implemented: its shape is not the
+  # MtpWeights any other family uses (own 512-expert stack, own indexer, two
+  # input norms of DIFFERENT widths). `load_mtp_weights` returns None, so
+  # `--speculative` is refused at pre-flight rather than half-wired.
+  speculative: false
