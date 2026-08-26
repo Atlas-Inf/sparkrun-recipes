@@ -32,11 +32,29 @@ metadata:
         --dflash --draft-model <drafter> \
         --dflash-gamma 4 --dflash-window-size 1024 \
         --max-seq-len 32768 --kv-cache-dtype fp8 \
-        --gpu-memory-utilization 0.88 --max-batch-size 8
+        --gpu-memory-utilization 0.80 --max-batch-size 8 \
+        --ssm-cache-slots 256 --dflash-window-size 1024
 
     `ATLAS_DFLASH_OPTION_B=1` is REQUIRED: the Lightning DSpark product policy
     (`dflash_head/product_policy.rs::validate`) refuses to start without it,
     and refuses to start if any DSpark diagnostic toggle is present.
+
+    Measured on a GB10 (2026-08-26), three reps per level, 512 output tokens,
+    zero failed requests at every level: 76.1 / 95.8 / 120.6 / 104.1 / 140.3
+    aggregate tok/s at concurrency 1 / 2 / 4 / 6 / 8 — 1.84x at C8 over C1,
+    17.6 tok/s per client. See the `gpu_memory_utilization` note below for why
+    that knob is 0.80 rather than 0.88; 0.88 does not survive C8 on this box.
+
+    Coherence: `scripts/dev/coherence_test.py` passes 10/10. Run it with
+    `--disable-thinking`. This model's MODEL.toml sets `thinking_default =
+    true` AND `cap_thinking_at_max_tokens = false`, so a small `max_tokens`
+    is spent entirely inside the reasoning block and `content` comes back
+    empty — correct behaviour that reads as incoherence. With thinking left on
+    and a large enough budget the same prompts answer correctly.
+
+    Do NOT pass `--disable-thinking` in production on this model: with thinking
+    forced off, multi-turn tool follow-ups return null `content`. With the
+    model's declared default the tool path is fine.
   maintainer: atlas-inf
   category: agent
   model_params: 30B
@@ -49,7 +67,14 @@ defaults:
   host: 0.0.0.0
   max_model_len: 32768
   kv_cache_dtype: fp8
-  gpu_memory_utilization: 0.88
+  # 0.80, NOT the 0.88 this recipe originally carried. Measured on a GB10
+  # (119 GB unified) on 2026-08-26: at 0.88 the box has ~6 GB of host memory
+  # left once the model is resident, and concurrency 8 exhausts it in about
+  # two seconds -- 6.4 GB available to 180 MB between consecutive samples --
+  # taking the machine off the network. At 0.80 the post-load headroom is
+  # ~15.8 GB and the full 1/2/4/6/8 ladder completes with zero failures.
+  # This is a cliff, not a gradient; do not raise it without re-measuring.
+  gpu_memory_utilization: 0.80
   scheduling_policy: slai
   # DSpark drafter. `dflash: true` maps to `--dflash`; the drafter id falls
   # through from the target's MODEL.toml [dflash].draft_model when omitted,
@@ -68,7 +93,20 @@ defaults:
   # correctness regression on SM12.x with DFlash (wrong outputs on multi-turn
   # cache hits). It is not merely a perf knob here.
   enable_prefix_caching: false
-  # 8 is both the server default and the widest tested decode batch here.
+  # 8 is the server default and is now measured, not assumed: the concurrency
+  # ladder was run to 8 on a GB10 at the gpu_memory_utilization above, three
+  # reps per level, 512 output tokens, zero failed requests at every level.
+  #
+  #   C   agg tok/s   vs C1   per-client   mean E2E
+  #   1       76.13   1.00x        76.14      6.72s
+  #   2       95.81   1.26x        47.93     10.68s
+  #   4      120.58   1.58x        30.18     16.97s
+  #   6      104.10   1.37x        17.37     29.48s
+  #   8      140.33   1.84x        17.57     29.15s
+  #
+  # The dip at 6 is reproducible and not understood; 6 requests do not divide
+  # into the max-batch-8 decode step as evenly as 8 do. It is a throughput
+  # artifact, not an error -- C6 fails nothing.
   max_batch_size: 8
   ssm_cache_slots: 256
   oom_guard_mb: 1024
