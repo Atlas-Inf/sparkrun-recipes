@@ -51,13 +51,20 @@ metadata:
     unified memory (`Addressing Mode: ATS`) — there is no second pool to move
     anything to. The table stays on NVMe; only the page cache holds hot rows.
 
+    ── Text-only, and the checkpoint is not ──────────────────────────────
+    The published index carries 333 vision tensors on top of the 296,142
+    text ones. This port is text-only: the kernel target has no
+    `vision_encoder` module, and Atlas says so at startup. The vision
+    weights load and are then unused. Nothing about the text path depends
+    on them, but a caller sending images will not get what it expects.
+
   maintainer: atlas-inf
   category: agent
   model_params: 180B
   active_params: 3B
   model_dtype: nvfp4
   quantization: nvfp4
-  kv_dtype: fp8
+  kv_dtype: bf16
 
 defaults:
   port: 8888
@@ -69,11 +76,24 @@ defaults:
   # reference: 0 tokens masked at 2048, 4 at 2052, 112 at 2064. A first
   # bring-up at this length is exact, not approximate, and needs no indexer.
   max_model_len: 2048
-  kv_cache_dtype: fp8
-  # ~83 GB of weights are resident; the KV cache is unusually cheap here (only
-  # 12 full-attention layers, 2 KV heads at head_dim 256), so this leaves ample
-  # room. Raise only with a measurement -- 0.88 on the sibling Lightning recipe
-  # took the box off the network at concurrency 8.
+  # bf16, NOT fp8 -- and the arithmetic is one-sided. Only 12 of 48 layers
+  # carry a KV cache at all (2 KV heads, head_dim 256), so at 2048 ctx a
+  # sequence costs 48 MiB in bf16 and 24 MiB in fp8. The entire saving at
+  # 8 concurrent sequences is 192 MiB, against ~83 GB of resident weights.
+  #
+  # What it would cost: this checkpoint ships NO k_scale/v_scale tensors, so
+  # the fp8 path defaults every scale to 1.0 and silently clips BF16 into
+  # E4M3's [-448, 448]. Atlas warns, correctly. Online calibration
+  # (--fp8-kv-calibration-tokens 256) would recover it, but that is a
+  # first-observe estimate traded for 24 MiB per sequence.
+  #
+  # Revisit with a measurement once decode exists; there is nothing to
+  # measure yet, and until then this is the setting that cannot be wrong.
+  kv_cache_dtype: bf16
+  # ~83 GB of weights are resident; the KV cache is unusually cheap here (see
+  # kv_cache_dtype above -- 48 MiB per sequence), so this leaves ample room.
+  # Raise only with a measurement -- 0.88 on the sibling Lightning recipe took
+  # the box off the network at concurrency 8.
   gpu_memory_utilization: 0.80
   max_batch_size: 4
   enable_prefix_caching: false
