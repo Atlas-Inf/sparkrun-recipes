@@ -22,10 +22,18 @@ metadata:
     is derived from `--dflash-gamma`, never passed by hand. Verified on a
     GB10: the server logs `num_drafts=3` from `gamma=4`.
 
-    ⚠ The four `dflash*` / `draft_model` keys below are NEW registry surface —
-    no other recipe in this repo uses them, so sparkrun's `atlas` runtime must
-    map them onto `--dflash` / `--draft-model` / `--dflash-gamma` /
-    `--dflash-window-size`. That mapping has NOT been verified from this repo.
+    The four `dflash*` / `draft_model` keys below are NEW registry surface — no
+    other recipe in this repo uses them. THE ATLAS-SIDE MAPPING IS NOW VERIFIED
+    (2026-09-01), against the engine rather than assumed:
+    `recipe/schema.rs::flag_for` turns a `defaults:` key into a flag by swapping
+    underscores for dashes, with a three-entry rename table (`max_model_len`,
+    `tensor_parallel`, `host`) and an EMPTY `NOT_FLAGS` list, and `argv_for`
+    renders `dflash: true` as the bare `--dflash` because clap reports it as a
+    presence-only flag. Every one of the fourteen keys in `defaults:` below was
+    checked against `spark serve --help` on a real binary: fourteen resolve,
+    zero unmapped. What is still unverified is only sparkrun's own `atlas`
+    runtime — a different program in a different repo — not Atlas.
+
     The equivalent direct invocation, which HAS been run on a GB10, is:
 
       ATLAS_DFLASH_OPTION_B=1 spark serve <target> \
