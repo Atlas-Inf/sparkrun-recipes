@@ -1,0 +1,48 @@
+recipe_version: "2"
+model: RadixArk/Qwen3.8-Flash-Next-NVFP4
+runtime: atlas
+container: azeezish/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Qwen3.8-Flash-Next (`model_type: qwen4_exp`) — a ~180B hybrid multimodal
+    MoE on ONE GB10. 48 layers interleaving gated-delta-net and full
+    attention 3:1, 512 experts top-10 plus a shared expert, a 4-stream
+    low-rank hyper-connection residual, a QSA sparse-attention indexer on the
+    12 full-attention layers, PLE n-gram injection at model layer 1, and a
+    ViT vision encoder.
+
+    CHECKPOINT CHOICE: NVFP4 is the only workable single-node release (the FP8
+    routed experts alone exceed GB10 physical capacity). The 47.7 GiB n-gram
+    table is never made resident — it is demand-paged by row off NVMe.
+    Resident memory peak is ~90.4 GB, leaving ~27 GB headroom on a 120 GB GB10.
+
+    KV CACHE: BF16 across the 12 full-attention layers (2 KV heads). The checkpoint
+    ships no k_scale/v_scale for FP8 KV quantization.
+
+    CONCURRENCY & BATCHING: Defaults to batch width 8 (`max_batch_size: 8`,
+    `max_num_seqs: 8`) for higher aggregate serving throughput.
+
+    THINKING SCAFFOLD: The chat template gates its workflow on reasoning tokens.
+    `default_chat_template_kwargs` sets `reasoning_effort: low` by default to render
+    the `<think>` preamble efficiently without unnecessary token overhead.
+  maintainer: atlas-inf
+  category: general
+  model_params: 180B
+  model_dtype: nvfp4
+  quantization: nvfp4
+  kv_dtype: bf16
+
+defaults:
+  port: 8889
+  host: 0.0.0.0
+  kernel_target: qwen3.8-flash-next
+  max_seq_len: 8192
+  kv_cache_dtype: bf16
+  gpu_memory_utilization: 0.88
+  max_num_seqs: 8
+  max_batch_size: 8
+  enable_prefix_caching: true
+  fast_load_prefetch_shards: true
+  default_chat_template_kwargs: '{"reasoning_effort":"low"}'
