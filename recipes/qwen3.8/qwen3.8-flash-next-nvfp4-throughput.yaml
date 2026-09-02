@@ -247,15 +247,12 @@ defaults:
   port: 8889
   host: 0.0.0.0
   kernel_target: qwen3.8-flash-next
-  max_seq_len: 32768
-  max_prefill_tokens: 32768
+  max_seq_len: 8192
   # bf16, not fp8 — this checkpoint ships no k/v scales. See the description.
   kv_cache_dtype: bf16
-  gpu_memory_utilization: 0.90
-  max_num_seqs: 1
-  max_batch_size: 1
-  speculative: true
-  num_drafts: 1
+  gpu_memory_utilization: 0.85
+  max_num_seqs: 4
+  max_batch_size: 4
   # Correct since the PLE/QSA aux state rides the snapshots, and faster since
   # the aux was attached to the snapshots warm turns actually hit.
   enable_prefix_caching: true
