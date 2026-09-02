@@ -86,12 +86,17 @@ image — pull a newer `azeezish/atlas-gb10:latest`.
 | `gemma-4-26b-a4b-nvfp4` | bg-digitalservices/Gemma-4-26B-A4B-it-NVFP4A16 | single | MoE GeGLU, ~67 tok/s |
 | `nemotron-3-super-120b-a12b-nvfp4` | nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 | single | LatentMoE, ~24 tok/s |
 | `nemotron-3-nano-30b-a3b-nvfp4` | nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4 | single | Mamba-2 + MoE, ~88 tok/s |
+| `qwen3.8-flash-next-nvfp4` | RadixArk/Qwen3.8-Flash-Next-NVFP4 | single | ~180B hybrid multimodal MoE, 32K driver profile, BF16 KV, MTP K=1 (~19 tok/s), PLE n-gram off NVMe |
+| `qwen3.8-flash-next-nvfp4-throughput` | RadixArk/Qwen3.8-Flash-Next-NVFP4 | single | 8K multi-sequence profile (max_num_seqs 4), BF16 KV, tuned for concurrent throughput |
 | `mistral-small-4-119b-nvfp4` | mistralai/Mistral-Small-4-119B-2603-NVFP4 | single | MLA, BF16-only KV (mandatory) |
 
 ## Layout
 
 ```
 recipes/
+├── qwen3.8/
+│   ├── qwen3.8-flash-next-nvfp4.yaml
+│   └── qwen3.8-flash-next-nvfp4-throughput.yaml
 ├── qwen3.5/
 │   ├── qwen3.5-27b-dense-nvfp4.yaml
 │   ├── qwen3.5-35b-a3b-nvfp4.yaml
