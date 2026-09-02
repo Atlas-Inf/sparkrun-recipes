@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: RadixArk/Qwen3.8-Flash-Next-NVFP4
 runtime: atlas
-container: azeezish/atlas-gb10:latest
+container: ghcr.io/atlas-inf/atlas-gb10:latest
 max_nodes: 1
 
 metadata:
@@ -253,6 +253,8 @@ defaults:
   gpu_memory_utilization: 0.85
   max_num_seqs: 4
   max_batch_size: 4
+  speculative: true
+  num_drafts: 1
   # Correct since the PLE/QSA aux state rides the snapshots, and faster since
   # the aux was attached to the snapshots warm turns actually hit.
   enable_prefix_caching: true
