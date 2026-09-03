@@ -47,6 +47,42 @@ metadata:
     (`dflash_head/product_policy.rs::validate`) refuses to start without it,
     and refuses to start if any DSpark diagnostic toggle is present.
 
+    ⚠ THE ENV STACK BELOW IS PART OF THIS CONFIGURATION AND THE RECIPE SCHEMA
+    CANNOT EXPRESS IT. `defaults:` carries serve FLAGS only — there is no
+    `env:` key in the Atlas recipe struct today — so these must be exported by
+    whoever starts the server:
+
+      ATLAS_DFLASH_OPTION_B=1   # required, see above
+      ATLAS_NO_TOOL_INJECT=1    # +15.58 BFCL overall, see below
+
+    ATLAS_NO_TOOL_INJECT is worth more on this model than every other knob in
+    this file combined, and it is DEFAULT OFF in the engine. Atlas normally
+    renders the tool contract TWICE — once from the jinja template, once
+    injected by the tool parser on top — and on a BFCL parallel prompt the
+    duplicate measures +1019 tokens, roughly 3x the native prompt. The flag
+    skips the injection so the template's block stands alone, which is what
+    vLLM does. Measured on a GB10, golden n=995 draw, same weights, same
+    scorer, thinking ON throughout:
+
+      config                          overall  normalized  halluc  live  non_live
+      shipped (injection on)            64.22     71.25     94.51  68.24   51.01
+      vLLM 0.28.0 (reference engine)    73.57     78.18     99.43  71.18   63.94
+      ATLAS_NO_TOOL_INJECT=1            79.80     82.40     96.21  77.06   73.92
+      ATLAS_NO_TOOL_INJECT=1 (rerun)    79.60     82.32
+
+    Two draws, 0.20 apart. It is the parallel-calling family that moves:
+    `parallel` 20.16 -> 75.00 and `live_parallel` 18.75 -> 87.50, both past
+    vLLM's 58.06 / 75.00. Hallucination ROSE (94.51 -> 96.21), so nothing was
+    traded — despite `prepare.rs` warning that this injection is load-bearing
+    for the hallucination category. That warning is why the flag ships off and
+    why a subset win was not treated as sufficient; the full draw disproved it.
+
+    ⚠ NOT YET A DEFAULT, AND THIS RECIPE DOES NOT MAKE IT ONE. Both draws are
+    single-turn. The multi-turn hazard the injection was written for cannot be
+    exercised by BFCL ST at all, so nothing here licenses flipping the engine
+    default. `simple_java` is also the one subset that REGRESSES without the
+    injection (59.68 -> 50.00) and nobody has explained it.
+
     Measured on a GB10 (2026-08-26), three reps per level, 512 output tokens,
     zero failed requests at every level: 76.1 / 95.8 / 120.6 / 104.1 / 140.3
     aggregate tok/s at concurrency 1 / 2 / 4 / 6 / 8 — 1.84x at C8 over C1,
@@ -63,6 +99,19 @@ metadata:
     Do NOT pass `--disable-thinking` in production on this model: with thinking
     forced off, multi-turn tool follow-ups return null `content`. With the
     model's declared default the tool path is fine.
+
+    And do NOT pass it alongside ATLAS_NO_TOOL_INJECT either, which is a
+    separate and stronger reason. The two interact, and the sign flips:
+
+      config                thinking ON   thinking OFF    delta
+      injection on             64.22         67.64       +3.42
+      ATLAS_NO_TOOL_INJECT     79.80         65.93      -13.87
+
+    Thinking-off HELPS while the duplicated prompt is present and costs 13.87
+    once it is gone. On a clean prompt the reasoning block is REQUIRED for
+    parallel calling — `parallel` 75.00 with thinking on versus 22.58 with it
+    off. Any measurement of thinking taken under the old injected prompt does
+    not transfer to this configuration.
   maintainer: atlas-inf
   category: agent
   model_params: 30B
