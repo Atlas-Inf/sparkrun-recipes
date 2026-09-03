@@ -1,0 +1,42 @@
+recipe_version: "2"
+model: unsloth/Qwen3.8-27B-NVFP4
+runtime: atlas
+container: azeezish/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Qwen3.8-27B (unsloth NVFP4, dense hybrid SSM+Attn) with DFlash2 block-diffusion
+    speculative decoding using incoai/Qwen3.8-27B-DFlash2 (γ=8, K=7 verify drafts).
+
+    Pairs the 27B NVFP4 target model with the DFlash2 5-layer drafter featuring
+    grouped dynamic causal convolutions and bilinear candidate selector.
+  maintainer: Atlas
+  category: agent
+  model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
+  model_dtype: nvfp4
+  quantization: NVFP4 (mixed precision above layer 55, FP8 linear_attn projections)
+  kv_dtype: fp8
+  updated: "2026-09-03"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 8192
+  max_batch_size: 1
+  gpu_memory_utilization: 0.88
+  kv_cache_dtype: fp8
+  lm_head_dtype: bf16
+  kv_high_precision_layers: auto
+  scheduling_policy: slai
+  enable_prefix_caching: false
+  ssm_cache_slots: 256
+  ssm_checkpoint_interval: 16
+  dflash: true
+  draft_model: incoai/Qwen3.8-27B-DFlash2
+  dflash_gamma: 8
+  num_drafts: 7
+  dflash_window_size: 4096
+  mtp_gate: force
+  gdn_fused_norm: true
+  video_allow_ffmpeg: true
