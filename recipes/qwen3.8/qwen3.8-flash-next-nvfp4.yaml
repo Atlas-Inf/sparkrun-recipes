@@ -32,6 +32,14 @@ metadata:
     with `kv_cache_dtype: bf16` and `--speculative --num-drafts 1` eliminates OOM
     when KV allocates against the ~112 GB model/arena footprint, delivering 36.7 tok/s.
 
+    PREFILL SPEEDUP (DIRECT PREAD vs MMAP): Baseline llama.cpp relies on `mmap`,
+    causing thousands of 4KB scattered OS page faults for tiny ~90-byte PLE rows
+    and stalling prefill at ~300 tok/s (addressed in llama.cpp PR #28136 via
+    parallel pread). Atlas's `NgramRowCache` uses an asynchronous O_DIRECT
+    parallel `pread` worker pool (QD=32) directly off NVMe, delivering 750–800 tok/s
+    cold prefill on DGX Spark (2.0–3.1x faster) and +20–32% on Strix Halo 128GB
+    without keeping the 47.7 GB n-gram table in RAM.
+
     KV IS BF16, DELIBERATELY. This checkpoint ships no `k_scale`/`v_scale`,
     so bare fp8 KV clips to E4M3 [-448, 448] and Atlas warns; calibration is
     the alternative and has not been validated for this model. Only 12 of 48

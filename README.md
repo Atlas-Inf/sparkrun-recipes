@@ -50,7 +50,7 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 | `qwen3.8-27b-nvfp4` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | **DEFAULT FLAGSHIP**. 27B dense hybrid GDN + attention, NVFP4, MTP speculative decoding, FP8 KV cache, 23.59 tok/s single-stream |
 | `qwen3.8-27b-nvfp4-latency` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | Low-concurrency / interactive profile tuned for minimal single-stream time-to-first-token and decode latency |
 | `qwen3.8-27b-nvfp4-throughput` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | Concurrency profile measured to beat vLLM from 1 to 128 streams on GB10 |
-| `qwen3.8-flash-next-nvfp4` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | ~180B hybrid MoE, 8K context / 8K prefill, BF16 KV, MTP K=1, 47.7 GB PLE n-gram streamed from NVMe (~95% util, 36.7 tok/s) |
+| `qwen3.8-flash-next-nvfp4` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | ~180B hybrid MoE, 8K context / 8K prefill, BF16 KV, MTP K=1, 47.7 GB PLE n-gram parallel `pread` NVMe offload (~95% util, 750–800 tok/s prefill, 36.7 tok/s decode) |
 | `qwen3.8-flash-next-nvfp4-throughput` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | 8K multi-sequence profile (max_num_seqs 4), BF16 KV, optimized for batched concurrent throughput |
 | `qwen3.8-27b-nvfp4-unsloth` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | Agentic gate config: thinking ON, BF16 head + BF16 KV, 32K context, MTP K=4, SLAi scheduler |
 | `qwen3.8-27b-nvfp4-unsloth-bfcl` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | BFCL v4 agentic tool-use benchmark profile |
