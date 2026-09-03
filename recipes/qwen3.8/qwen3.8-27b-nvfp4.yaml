@@ -1,0 +1,53 @@
+recipe_version: "2"
+model: unsloth/Qwen3.8-27B-NVFP4
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Qwen3.8-27B (NVFP4, dense hybrid SSM+Attn) — the default flagship
+    interactive / latency profile on a single GB10 (SM121).
+
+    Single-stream performance: 23.59 tok/s at C=1 with MTP speculative decoding.
+    Pre-compiled SM121 kernels with double-buffered GDN scans and native FP4
+    tensor-core prefill GEMMs.
+
+    ENV STACK (export before launch):
+      ATLAS_PREFILL_CODISPATCH=1        # prefill co-scheduling for low TTFT
+      ATLAS_FP8_ROWWISE=1               # native per-row FP8 GDN projections (+21% prefill)
+
+    For high-concurrency batch serving use `qwen3.8-27b-nvfp4-throughput`.
+    For agentic coding with thinking-on use `qwen3.8-27b-nvfp4-unsloth`.
+    For ~180B hybrid MoE use `qwen3.8-flash-next-nvfp4`.
+  maintainer: Atlas-Inf
+  category: interactive
+  model_params: 27B
+  model_dtype: nvfp4
+  quantization: nvfp4
+  kv_dtype: fp8
+  updated: "2026-09-03"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 32768
+  max_batch_size: 8
+  gpu_memory_utilization: 0.85
+  kv_cache_dtype: fp8
+  enable_prefix_caching: true
+  ssm_cache_slots: 64
+  ssm_checkpoint_interval: 16
+  speculative: true
+  num_drafts: 3
+  mtp_quantization: bf16
+  scheduling_policy: fifo
+  tool_call_parser: qwen3_coder
+  disable_tool_grammar: true
+  disable_thinking: true
+  ssm_h_dtype: f16-pool
+  gdn_fused_norm: true
+  ssm_batched_recurrent: true
+  ssm_tail_midchunk: false
+  mtp_gate: force
+  prefill_varlen_batch: true

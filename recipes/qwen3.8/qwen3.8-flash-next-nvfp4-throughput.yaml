@@ -25,7 +25,7 @@ metadata:
     Without that exclusion the same run refuses at 163.64 GB. Verified
     independently on two GB10s.
 
-    Throughput, measured (Avarok #754): decode 16.5 tok/s, prefill 747 tok/s
+    Throughput, measured (Atlas-Inf #754): decode 16.5 tok/s, prefill 747 tok/s
     at a 2191-token prompt, C=2 aggregate 20.5 tok/s.
 
     KV IS BF16, DELIBERATELY. This checkpoint ships no `k_scale`/`v_scale`,
