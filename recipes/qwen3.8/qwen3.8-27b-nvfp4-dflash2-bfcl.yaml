@@ -7,12 +7,14 @@ max_nodes: 1
 metadata:
   description: |
     Qwen3.8-27B (unsloth NVFP4, dense hybrid SSM+Attn) with DFlash2 block-diffusion
-    speculative decoding using incoai/Qwen3.8-27B-DFlash2 (γ=8, K=7 verify drafts).
+    speculative decoding — the BFCL / tool-calling and performance configuration
+    measured under `bfcl-subset` (n=995 MLPerf-edge draw).
 
-    Pairs the 27B NVFP4 target model with the DFlash2 5-layer drafter featuring
-    grouped dynamic causal convolutions and bilinear candidate selector.
+    Pairs the 27B NVFP4 target model with the DFlash2 5-layer drafter (γ=8, K=7
+    verify drafts) featuring grouped dynamic causal convolutions, fused GDN output
+    norm, and on-device bilinear candidate selector.
   maintainer: Atlas
-  category: agent
+  category: function-calling
   model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
   model_dtype: nvfp4
   quantization: NVFP4 (mixed precision above layer 55, FP8 linear_attn projections)
@@ -39,4 +41,6 @@ defaults:
   dflash_window_size: 4096
   mtp_gate: force
   gdn_fused_norm: true
-  video_allow_ffmpeg: true
+  tool_call_parser: qwen3_coder
+  disable_tool_grammar: true
+  disable_thinking: true
