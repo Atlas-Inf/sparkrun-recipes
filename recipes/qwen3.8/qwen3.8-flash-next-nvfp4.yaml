@@ -25,8 +25,20 @@ metadata:
     Without that exclusion the same run refuses at 163.64 GB. Verified
     independently on two GB10s.
 
-    Throughput, measured (Avarok #754): decode 16.5 tok/s, prefill 747 tok/s
+    Throughput, measured (Atlas-Inf #754): decode 16.5 tok/s, prefill 747 tok/s
     at a 2191-token prompt, C=2 aggregate 20.5 tok/s.
+    Live verification (2026-09-03, DGX Spark 128 GB GB10): Sizing
+    `max_prefill_tokens: 8192` (instead of 32k) and `gpu_memory_utilization: 0.95`
+    with `kv_cache_dtype: bf16` and `--speculative --num-drafts 1` eliminates OOM
+    when KV allocates against the ~112 GB model/arena footprint, delivering 36.7 tok/s.
+
+    PREFILL SPEEDUP (DIRECT PREAD vs MMAP): Baseline llama.cpp relies on `mmap`,
+    causing thousands of 4KB scattered OS page faults for tiny ~90-byte PLE rows
+    and stalling prefill at ~300 tok/s (addressed in llama.cpp PR #28136 via
+    parallel pread). Atlas's `NgramRowCache` uses an asynchronous O_DIRECT
+    parallel `pread` worker pool (QD=32) directly off NVMe, delivering 750–800 tok/s
+    cold prefill on DGX Spark (2.0–3.1x faster) and +20–32% on Strix Halo 128GB
+    without keeping the 47.7 GB n-gram table in RAM.
 
     KV IS BF16, DELIBERATELY. This checkpoint ships no `k_scale`/`v_scale`,
     so bare fp8 KV clips to E4M3 [-448, 448] and Atlas warns; calibration is
@@ -247,11 +259,11 @@ defaults:
   port: 8889
   host: 0.0.0.0
   kernel_target: qwen3.8-flash-next
-  max_seq_len: 32768
-  max_prefill_tokens: 32768
+  max_seq_len: 8192
+  max_prefill_tokens: 8192
   # bf16, not fp8 — this checkpoint ships no k/v scales. See the description.
   kv_cache_dtype: bf16
-  gpu_memory_utilization: 0.90
+  gpu_memory_utilization: 0.95
   max_num_seqs: 1
   max_batch_size: 1
   speculative: true
