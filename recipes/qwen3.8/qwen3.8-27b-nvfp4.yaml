@@ -1,11 +1,15 @@
 recipe_version: "2"
-model: unsloth/Qwen3.8-27B-NVFP4
+model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
 container: ghcr.io/atlas-inf/atlas-gb10:latest
 max_nodes: 1
 
 metadata:
   description: |
+    ⚠ CHECKPOINT CHANGED 2026-09-12: this recipe now serves
+    nvidia/Qwen3.8-27B-NVFP4 (modelopt MIXED_PRECISION), not unsloth. The
+    unsloth-specific prose below describes the PREVIOUS checkpoint and is kept
+    for provenance. Serve flags are UNCHANGED.
     Qwen3.8-27B (NVFP4, dense hybrid SSM+Attn) — the default flagship
     interactive / latency profile on a single GB10 (SM121).
 
@@ -17,8 +21,8 @@ metadata:
       ATLAS_PREFILL_CODISPATCH=1        # prefill co-scheduling for low TTFT
       ATLAS_FP8_ROWWISE=1               # native per-row FP8 GDN projections (+21% prefill)
 
-    For high-concurrency batch serving use `qwen3.8-27b-nvfp4-throughput`.
-    For agentic coding with thinking-on use `qwen3.8-27b-nvfp4-unsloth`.
+    For high-concurrency batch serving use `qwen3.8-27b-nvfp4-concurrency`.
+    For agentic coding with thinking-on use `qwen3.8-27b-nvfp4-agentic`.
     For ~180B hybrid MoE use `qwen3.8-flash-next-nvfp4`.
   maintainer: Atlas-Inf
   category: interactive

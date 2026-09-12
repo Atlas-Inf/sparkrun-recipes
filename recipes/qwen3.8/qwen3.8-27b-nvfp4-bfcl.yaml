@@ -1,12 +1,17 @@
 recipe_version: "2"
-model: unsloth/Qwen3.8-27B-NVFP4
+model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
 container: azeezish/atlas-gb10:latest
 max_nodes: 1
 
 metadata:
   description: |
-    Qwen3.8-27B (unsloth NVFP4, dense hybrid SSM+Attn) — the BFCL / tool-calling
+    ⚠ CHECKPOINT CHANGED 2026-09-12: this recipe now serves
+    nvidia/Qwen3.8-27B-NVFP4 (modelopt MIXED_PRECISION), not unsloth. The
+    unsloth-specific prose below describes the PREVIOUS checkpoint and is kept
+    for provenance. Serve flags are UNCHANGED — which matters here more than
+    anywhere: this leg's measured bars are tied to this exact config.
+    Qwen3.8-27B (nvidia NVFP4, dense hybrid SSM+Attn) — the BFCL / tool-calling
     config, and the config the `bfcl-subset` gate is measured under for this
     checkpoint.
 
