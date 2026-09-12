@@ -14,7 +14,7 @@ sparkrun run @atlas/qwen3.8-flash-next-nvfp4 --hosts localhost
 sparkrun run @atlas/nemotron-3.5-lightning-30b-a3b-nvfp4-dspark --hosts localhost
 
 # Qwen 3.8 27B low-latency dense hybrid
-sparkrun run @atlas/qwen3.8-27b-nvfp4-latency --hosts localhost
+sparkrun run @atlas/qwen3.8-27b-nvfp4 --hosts localhost
 
 # Multi-node Expert Parallelism across 2 Sparks (EP=2)
 sparkrun run @atlas/deepseek-v4-flash-nvfp4-ep2 --hosts <spark-1>,<spark-2>
@@ -47,13 +47,12 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 #### Qwen3.8 (Flagship)
 | Recipe | Model Checkpoint | Topology | Description |
 |---|---|:---:|---|
-| `qwen3.8-27b-nvfp4` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | **DEFAULT FLAGSHIP**. 27B dense hybrid GDN + attention, NVFP4, MTP speculative decoding, FP8 KV cache, 23.59 tok/s single-stream |
-| `qwen3.8-27b-nvfp4-latency` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | Low-concurrency / interactive profile tuned for minimal single-stream time-to-first-token and decode latency |
-| `qwen3.8-27b-nvfp4-throughput` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | Concurrency profile measured to beat vLLM from 1 to 128 streams on GB10 |
+| `qwen3.8-27b-nvfp4` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | **DEFAULT FLAGSHIP**. 27B dense hybrid GDN + attention, NVFP4, MTP speculative decoding, FP8 KV cache, 23.59 tok/s single-stream |
+| `qwen3.8-27b-nvfp4-concurrency` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | Concurrency profile measured to beat vLLM from 1 to 128 streams on GB10 |
 | `qwen3.8-flash-next-nvfp4` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | ~180B hybrid MoE, 8K context / 8K prefill, BF16 KV, MTP K=1, 47.7 GB PLE n-gram parallel `pread` NVMe offload (~95% util, 750–800 tok/s prefill, 36.7 tok/s decode) |
 | `qwen3.8-flash-next-nvfp4-throughput` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | 8K multi-sequence profile (max_num_seqs 4), BF16 KV, optimized for batched concurrent throughput |
-| `qwen3.8-27b-nvfp4-unsloth` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | Agentic gate config: thinking ON, BF16 head + BF16 KV, 32K context, MTP K=4, SLAi scheduler |
-| `qwen3.8-27b-nvfp4-unsloth-bfcl` | `unsloth/Qwen3.8-27B-NVFP4` | Single GB10 | BFCL v4 agentic tool-use benchmark profile |
+| `qwen3.8-27b-nvfp4-agentic` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | Agentic gate config: thinking ON, BF16 head + BF16 KV, 32K context, MTP K=4, SLAi scheduler |
+| `qwen3.8-27b-nvfp4-bfcl` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | BFCL v4 agentic tool-use benchmark profile (its bars are tied to this exact config; do not add serve overrides) |
 
 #### Qwen3.6
 | Recipe | Model Checkpoint | Topology | Description |
@@ -137,12 +136,11 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 recipes/
 ├── qwen3.8/
 │   ├── qwen3.8-27b-nvfp4.yaml
-│   ├── qwen3.8-27b-nvfp4-latency.yaml
-│   ├── qwen3.8-27b-nvfp4-throughput.yaml
+│   ├── qwen3.8-27b-nvfp4-agentic.yaml
+│   ├── qwen3.8-27b-nvfp4-concurrency.yaml
+│   ├── qwen3.8-27b-nvfp4-bfcl.yaml
 │   ├── qwen3.8-flash-next-nvfp4.yaml
-│   ├── qwen3.8-flash-next-nvfp4-throughput.yaml
-│   ├── qwen3.8-27b-nvfp4-unsloth.yaml
-│   └── qwen3.8-27b-nvfp4-unsloth-bfcl.yaml
+│   └── qwen3.8-flash-next-nvfp4-throughput.yaml
 ├── qwen3.6/
 │   ├── qwen3.6-35b-a3b-fp8-mtp.yaml
 │   ├── qwen3.6-35b-a3b-nvfp4.yaml

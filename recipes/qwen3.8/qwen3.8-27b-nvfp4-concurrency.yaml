@@ -1,18 +1,22 @@
 recipe_version: "2"
-model: unsloth/Qwen3.8-27B-NVFP4
+model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
 container: azeezish/atlas-gb10:latest
 max_nodes: 1
 
 metadata:
   description: |
-    Qwen3.8-27B (unsloth NVFP4, dense hybrid SSM+Attn) — the THROUGHPUT profile:
+    ⚠ CHECKPOINT CHANGED 2026-09-12: this recipe now serves
+    nvidia/Qwen3.8-27B-NVFP4 (modelopt MIXED_PRECISION), not unsloth. The
+    unsloth-specific prose below describes the PREVIOUS checkpoint and is kept
+    for provenance. Serve flags are UNCHANGED.
+    Qwen3.8-27B (nvidia NVFP4, dense hybrid SSM+Attn) — the THROUGHPUT profile:
     the configuration measured to beat vLLM at EVERY concurrency from 1 to 128
     on GB10.
 
     ★ THIS IS A CONCURRENCY PROFILE. Its sibling
-    `qwen3.8-27b-nvfp4-latency.yaml` is the low-concurrency / interactive
-    config, and `qwen3.8-27b-nvfp4-unsloth.yaml` is the AGENTIC profile
+    `qwen3.8-27b-nvfp4.yaml` is the low-concurrency / interactive
+    config, and `qwen3.8-27b-nvfp4-agentic.yaml` is the AGENTIC profile
     (thinking ON, bf16 lm-head, batch 1). They are not interchangeable — see
     "WHEN NOT TO USE THIS" below.
 
@@ -66,7 +70,7 @@ metadata:
     WHEN NOT TO USE THIS. The `max_batch_size: 128` + fp8 KV geometry is sized
     for concurrent serving. For a single interactive user, the latency sibling
     is the right profile; for long agentic coding trajectories use
-    `qwen3.8-27b-nvfp4-unsloth.yaml`, whose bf16 lm-head is a correctness pin
+    `qwen3.8-27b-nvfp4-agentic.yaml`, whose bf16 lm-head is a correctness pin
     (low-margin argmax flips compound over a trajectory) that this profile
     deliberately trades away for speed.
 

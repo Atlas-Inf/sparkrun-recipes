@@ -1,12 +1,20 @@
 recipe_version: "2"
-model: unsloth/Qwen3.8-27B-NVFP4
+model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
 container: azeezish/atlas-gb10:latest
 max_nodes: 1
 
 metadata:
   description: |
-    Qwen3.8-27B (unsloth NVFP4, dense hybrid SSM+Attn) — the AGENTIC profile,
+    ⚠ CHECKPOINT CHANGED 2026-09-12: this recipe now serves
+    nvidia/Qwen3.8-27B-NVFP4 (modelopt MIXED_PRECISION), not unsloth. The
+    unsloth-specific prose below — compressed-tensors version strings, the
+    "1968 tensors match Qwen3.6-27B" verification — describes the PREVIOUS
+    checkpoint and is kept for provenance. Serve flags are UNCHANGED; the
+    nvidia build fits this config with 36.0 GB of KV cache where the unsloth
+    one no longer fits at all (measured 2026-09-11/12 on reiner: 41.8 GB
+    pre-KV + 23.9 GB reserve vs 59.5 + 43.0).
+    Qwen3.8-27B (nvidia NVFP4, dense hybrid SSM+Attn) — the AGENTIC profile,
     and the config the `agentic-webserver` gate's dense variant is measured
     under.
 
@@ -95,7 +103,7 @@ metadata:
     To raise it, override `max_model_len` at run time rather than editing this
     file, so the gate config stays reproducible:
 
-        sparkrun run @atlas/qwen3.8-27b-nvfp4-unsloth --max-model-len 131072
+        sparkrun run @atlas/qwen3.8-27b-nvfp4-agentic --max-model-len 131072
 
     Two honest constraints before you do:
 
@@ -125,7 +133,7 @@ metadata:
   category: agent
   model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
   model_dtype: nvfp4
-  quantization: NVFP4 (mixed precision above layer 55, FP8 linear_attn projections)
+  quantization: NVFP4 (modelopt MIXED_PRECISION — FP8 linear_attn projections + NVFP4 MLP)
   kv_dtype: bf16
   updated: "2026-08-15"
 
