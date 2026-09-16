@@ -20,10 +20,11 @@ metadata:
     88.24 vs committed bars 83.42/83.32 (thinking on, Option-B drafter) — was
     measured on the nvidia checkpoint.
 
-    KV is BF16, thinking ON, tool grammar ON — byte-faithful to the record's
-    serve config (jobqueue 104: dflash=true, speculative=false,
-    disable_thinking=false, util 0.75). Same Option-B env note and
-    prefix-caching caution as the sibling dflash2 recipe:
+    KV is BF16, thinking ON, tool grammar ON — matching the record's serve
+    config (jobqueue 104: dflash=true, speculative=false,
+    disable_thinking=false; the record ran util 0.75, this ships 0.80 for
+    headroom — util sizes the KV pool, not the math). Same Option-B env note
+    and prefix-caching caution as the sibling dflash2 recipe:
 
       ATLAS_DFLASH_OPTION_B=1    # paged Option-B drafter; default since
                                # atlas#33, set explicitly on older images
