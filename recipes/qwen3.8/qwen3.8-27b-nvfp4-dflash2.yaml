@@ -1,0 +1,68 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-27B-NVFP4
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Qwen3.8-27B (nvidia NVFP4, dense hybrid SSM+Attn) with DFlash2 block-diffusion
+    speculative decoding using incoai/Qwen3.8-27B-DFlash2 (γ=8, K=7 verify drafts).
+
+    Pairs the 27B NVFP4 target model with the DFlash2 5-layer drafter featuring
+    grouped dynamic causal convolutions and bilinear candidate selector.
+
+    ⚠ CHECKPOINT CHANGED 2026-09-16: serves nvidia/Qwen3.8-27B-NVFP4 (modelopt
+    MIXED_PRECISION — FP8 on linear_attn/self_attn paths, NVFP4 MLP), matching
+    the sibling qwen3.8-27b-nvfp4 recipe. The GB10 gate legs (bfcl-subset
+    87.94/88.24 vs bars 83.42/83.32; γ=16 fault-fix verified; single-stream
+    ~34 tok/s γ8 / ~45.5 tok/s γ16 incl. TTFT vs MTP 20.9) were all measured
+    on the nvidia checkpoint.
+
+    KV is BF16 — that is the validated DFlash2 configuration on GB10, and the
+    nvidia pack's mixed-precision map is declared per-layer so bf16 KV is the
+    safe default here.
+
+    SCOPE: single-stream only (max_batch_size 1). Batched DFlash2 concurrency
+    is a documented WIP — measured flat ~24-26 tok/s aggregate at C1-C16 on
+    GB10 (the verify+propose steps serialize per sequence); MTP remains the
+    right choice for concurrent serving. See the DFlash2 porting log's
+    known-gaps section.
+
+    env (no `env:` key in the recipe struct — export before serve):
+      ATLAS_DFLASH_OPTION_B=1    # paged Option-B drafter incl. the _h128 fix;
+                               # default since atlas#33, set explicitly on any
+                               # image that predates it (pre-#33 γ=16 faulted)
+
+    enable_prefix_caching stays FALSE deliberately — DFlash + prefix caching
+    reported an illegal-address fault on GB10 (see porting log).
+  maintainer: Atlas
+  category: agent
+  model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
+  model_dtype: nvfp4
+  quantization: "NVFP4 (mixed precision — FP8 linear_attn/self_attn, NVFP4 MLP)"
+  kv_dtype: bf16
+  updated: "2026-09-16"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 8192
+  max_batch_size: 1
+  gpu_memory_utilization: 0.80
+  kv_cache_dtype: bf16
+  lm_head_dtype: bf16
+  kv_high_precision_layers: auto
+  scheduling_policy: slai
+  enable_prefix_caching: false
+  ssm_cache_slots: 256
+  ssm_checkpoint_interval: 16
+  speculative: false
+  dflash: true
+  draft_model: incoai/Qwen3.8-27B-DFlash2
+  dflash_gamma: 8
+  num_drafts: 7
+  dflash_window_size: 4096
+  mtp_gate: force
+  gdn_fused_norm: true
+  video_allow_ffmpeg: true
