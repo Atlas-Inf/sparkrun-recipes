@@ -30,9 +30,37 @@ metadata:
     known-gaps section.
 
     env (no `env:` key in the recipe struct — export before serve):
-      ATLAS_DFLASH_OPTION_B=1    # paged Option-B drafter incl. the _h128 fix;
-                               # default since atlas#33, set explicitly on any
-                               # image that predates it (pre-#33 γ=16 faulted)
+      ATLAS_DFLASH_OPTION_B=1      # paged Option-B drafter incl. the _h128 fix;
+                                 # default since atlas#33, set explicitly on any
+                                 # image that predates it (pre-#33 γ=16 faulted)
+      ATLAS_MTP_POOL_FULL_WIDTH=1  # REQUIRED on current images — see below
+
+    ATLAS_MTP_POOL_FULL_WIDTH=1 is REQUIRED on the current image: the tiered
+    SSM MTP pools size per-slot H-intermediates from the MTP K-ladder (≤3),
+    and under --dflash the pool's `num_intermediates != num_drafts + 1`
+    uniform-sizing detection is unreachable — num_drafts resolves to γ-1=7,
+    so the two always compare equal. Every slot is then allocated only 3 H
+    intermediates while a γ=8 verify needs 7: the first verify step fails
+    with "SSM MTP intermediate buffers not allocated" and finishes the
+    request at one token. Full-width pools give every slot γ-1
+    intermediates. Measured on GB10 2026-09-17 (this recipe, thinking off):
+    serial=0.00 mtp=1.00 p1=0.410 mean_na=0.506 tok_step=1.506 — drafts
+    accepting where the verify previously errored on token 1. bs=1 cost is
+    ~0.5 GB. The permanent fix is engine-side (uniform sizing whenever
+    DFlash is active); this env is the interim recipe gate.
+
+    num_drafts is deliberately NOT in defaults: below. --dflash already
+    derives num_drafts = γ-1 = 7, and passing --num-drafts explicitly trips
+    the flag validator on current images ("--num-drafts N is set but no
+    speculative method is enabled" — the validator does not count --dflash
+    as a speculative method). Omitting it serves the identical value.
+
+    NOTE on observing acceptance: this target defaults thinking ON and the
+    scheduler serializes inside <think> unless ATLAS_DFLASH_SPEC_THINK=1 —
+    expected, not a bug. Acceptance is observable only post-</think> or with
+    thinking off (chat_template_kwargs.enable_thinking=false). A short
+    probe that never leaves <think> reports serial=1.00 mean_na=0.000; do
+    not read that as a DFlash failure.
 
     enable_prefix_caching stays FALSE deliberately — DFlash + prefix caching
     reported an illegal-address fault on GB10 (see porting log).
@@ -42,7 +70,7 @@ metadata:
   model_dtype: nvfp4
   quantization: "NVFP4 (mixed precision — FP8 linear_attn/self_attn, NVFP4 MLP)"
   kv_dtype: bf16
-  updated: "2026-09-16"
+  updated: "2026-09-17"
 
 defaults:
   host: 0.0.0.0
@@ -61,7 +89,9 @@ defaults:
   dflash: true
   draft_model: incoai/Qwen3.8-27B-DFlash2
   dflash_gamma: 8
-  num_drafts: 7
+  # num_drafts intentionally absent: --dflash derives it as γ-1 (=7), and an
+  # explicit --num-drafts trips the flag validator on current images
+  # ("no speculative method is enabled" — it does not count --dflash).
   dflash_window_size: 4096
   mtp_gate: force
   gdn_fused_norm: true
