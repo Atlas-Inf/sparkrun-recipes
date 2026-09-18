@@ -1,5 +1,5 @@
 recipe_version: "2"
-model: RadixArk/Qwen3.8-Flash-Next-NVFP4
+model: nvidia/Qwen3.8-Flash-Next-NVFP4
 runtime: atlas
 container: ghcr.io/atlas-inf/atlas-gb10:latest
 max_nodes: 1
@@ -16,7 +16,14 @@ metadata:
     CHECKPOINT CHOICE IS NOT A PREFERENCE. The FP8 release does not fit: its
     routed experts alone are 123.3 GB resident against a GB10's ~119.6 GiB.
     NVFP4 is the only workable release, and its 47.7 GiB n-gram table is
-    never made resident — it is read by ROW off NVMe. Measured on a GB10:
+    never made resident — it is read by ROW off NVMe. This recipe names
+    NVIDIA's official ModelOpt pack (nvidia/Qwen3.8-Flash-Next-NVFP4,
+    hf_quant_config MIXED_PRECISION: 48 NVFP4 + 2 FP8 entries) — the subject
+    of Atlas-Inf atlas#35 and the pack verified serving end-to-end on a GB10
+    at 9264bf4ec (boot + kernel audit + thinking/non-thinking chat + MTP
+    accept + qwen3_coder tool call). The earlier RadixArk community mirror
+    was the original subject; either needs the same qwen3.8-flash-next
+    kernel target. Measured on a GB10:
 
       pre-flight     78.19 GB on-disk, 1.3x = 101.65 GB projected peak
       actual peak    ~90.4 GB, ~27.8 GB free, 8 GiB guard held
