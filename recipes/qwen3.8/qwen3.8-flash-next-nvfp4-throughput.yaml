@@ -1,5 +1,5 @@
 recipe_version: "2"
-model: RadixArk/Qwen3.8-Flash-Next-NVFP4
+model: nvidia/Qwen3.8-Flash-Next-NVFP4
 runtime: atlas
 container: ghcr.io/atlas-inf/atlas-gb10:latest
 max_nodes: 1
