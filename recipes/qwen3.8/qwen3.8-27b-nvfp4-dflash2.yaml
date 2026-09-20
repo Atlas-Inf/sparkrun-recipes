@@ -33,9 +33,13 @@ metadata:
       ATLAS_DFLASH_OPTION_B=1      # paged Option-B drafter incl. the _h128 fix;
                                  # default since atlas#33, set explicitly on any
                                  # image that predates it (pre-#33 γ=16 faulted)
-      ATLAS_MTP_POOL_FULL_WIDTH=1  # REQUIRED on current images — see below
+      ATLAS_MTP_POOL_FULL_WIDTH=1  # REQUIRED only on images predating
+                                 # atlas#38 (pre-sha-da94385 / pre-2026-09-19
+                                 # :latest) — see below
 
-    ATLAS_MTP_POOL_FULL_WIDTH=1 is REQUIRED on the current image: the tiered
+    ATLAS_MTP_POOL_FULL_WIDTH=1 is REQUIRED only on images before atlas#38
+    (sha-da94385, :latest 2026-09-19) fixed it engine-side — uniform SSM pool
+    sizing whenever DFlash is active. On older images: the tiered
     SSM MTP pools size per-slot H-intermediates from the MTP K-ladder (≤3),
     and under --dflash the pool's `num_intermediates != num_drafts + 1`
     uniform-sizing detection is unreachable — num_drafts resolves to γ-1=7,
