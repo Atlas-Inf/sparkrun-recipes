@@ -17,9 +17,11 @@ metadata:
 
     ⚠ SIBLING RECIPE, DIFFERENT JOB. `qwen3.8-27b-nvfp4-unsloth.yaml` is the
     AGENTIC config (thinking ON, bf16 lm-head, slai, 0.85 util, SSM cache
-    256/16). This one is thinking OFF with the qwen3_coder parser and grammar
-    disabled. They are not interchangeable and neither substitutes for the
-    other — each is pinned to a different gate's measured config.
+    256/16). This one is the BFCL gate config: qwen3_coder parser, grammar
+    disabled, K=2 MTP, thinking ON since 2026-09-19 (see the note at
+    `disable_thinking` below — it was OFF for the 3.6 history). They are not
+    interchangeable and neither substitutes for the other — each is pinned to
+    a different gate's measured config.
 
     WHY THE FLAGS BELOW ARE A COPY, NOT A CHOICE.
 
@@ -77,4 +79,15 @@ defaults:
   mtp_quantization: bf16
   tool_call_parser: qwen3_coder
   disable_tool_grammar: true
-  disable_thinking: true
+  # 2026-09-19: thinking ON for the nvidia pack. With `disable_thinking: true`
+  # nvidia/Qwen3.8-27B-NVFP4 scores 85.13 / 76.60 on the golden ST-995 draw
+  # (hallucination 55.11 — the model emits tool calls where it should abstain;
+  # three identical draws 09-12/13 across two trees and two spec lanes). The
+  # abstention behaviour lives in the thinking pass on this checkpoint: the
+  # same gate with disable_thinking=false + reasoning_effort "medium" scores
+  # 87.94 / 88.24 (run-1789419056919283587, GB10, 2026-09-15). Not a kernel or
+  # quantization effect — see atlas docs/porting/QWEN38_NVIDIA_PORT_LOG_2026-09-15.md
+  # §A and QWEN38_PORT_GAP_ANALYSIS §I.5. The BFCL draw itself is unchanged
+  # (62/10/10, n=995, seed 42, temp 0, no param overrides).
+  disable_thinking: false
+  default_chat_template_kwargs: '{"reasoning_effort":"medium"}'
