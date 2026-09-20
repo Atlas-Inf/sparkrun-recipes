@@ -56,9 +56,20 @@ defaults:
   host: 0.0.0.0
   kernel_target: qwen3.8-flash-next
   max_seq_len: 32768
-  max_prefill_tokens: 32768
+  # 8192, not 32768: the prefill arena is per-token (~3.3 GB at 8K, ~13 GB
+  # at 32K) and with the MTP draft module (1.77 GB) + verify pools resident
+  # a 32K arena leaves no KV budget at util 0.90 — the serve refuses to
+  # build ("No memory left for KV cache"). Measured on GB10 2026-09-19/20:
+  # util 0.88 / prefill 8192 / --num-drafts 3 refused; util 0.90 / prefill
+  # 8192 / --num-drafts 1 booted with a 115K-token KV pool and 10.4 GB of
+  # host headroom and served a 50-iteration agentic soak (prompts to 25K,
+  # chunked) with zero faults. Long prompts still work — they prefill in
+  # 8K chunks.
+  max_prefill_tokens: 8192
   # bf16, not fp8 — this checkpoint ships no k/v scales.
   kv_cache_dtype: bf16
+  # 0.90 is the ceiling that keeps the host side alive on the unified
+  # 128 GB: 0.93 left 0.87 GB MemAvailable, 0.95 was OOM-killed mid-run.
   gpu_memory_utilization: 0.90
   max_num_seqs: 1
   max_batch_size: 1
