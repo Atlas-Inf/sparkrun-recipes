@@ -23,11 +23,16 @@ metadata:
     nvidia pack's mixed-precision map is declared per-layer so bf16 KV is the
     safe default here.
 
-    SCOPE: single-stream only (max_batch_size 1). Batched DFlash2 concurrency
-    is a documented WIP — measured flat ~24-26 tok/s aggregate at C1-C16 on
-    GB10 (the verify+propose steps serialize per sequence); MTP remains the
-    right choice for concurrent serving. See the DFlash2 porting log's
-    known-gaps section.
+    SCOPE: defaults stay single-stream (max_batch_size 1) — peak per-request
+    rate. Batched DFlash2 concurrency WORKS on GB10 as of the
+    batched-verify envelope + stream-ordering fixes (Atlas-Inf lane
+    `integration/nvidia-lane-2026-09-20`, reiner jobqueue leg 208):
+    C1–C16 sweep scales 25.2 → 33.6 → 40.2 → 42.1 tok/s aggregate with
+    ~500 batched verifies and zero faults. Serve
+    with max_batch_size/max_num_seqs ≥ your concurrency to engage the
+    batched path; `ATLAS_DFLASH_PROPOSE_LANES>1` is an opt-in experimental
+    multi-lane propose (functionally correct, not yet a perf win — leave
+    unset).
 
     env (no `env:` key in the recipe struct — export before serve):
       ATLAS_DFLASH_OPTION_B=1      # paged Option-B drafter incl. the _h128 fix;
