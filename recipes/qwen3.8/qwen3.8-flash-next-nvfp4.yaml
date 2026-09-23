@@ -91,10 +91,20 @@ metadata:
     is already amortizing the weight reads speculation exists to amortize,
     which is why the sign flips with width.
 
-    This recipe still ships it OFF because the recipe has one setting for
-    every concurrency and the win is C=1-only. To take the C=1 win, serve
-    with `--speculative --num-drafts 1` and leave the throughput gate armed:
-    it measures both modes per serve and parks in Serial once width rises.
+    SPECULATION IS C=1-ONLY ON THIS MODEL, HARD BOUNDARY: the 512-expert mHC
+    MoE has no batched-verify arm — with 2+ active sequences the batched
+    verify declines ("no batched MoE arm for K=4... no per-row staging under
+    the highway") and requests error mid-decode. Verified 2026-09-23 on the
+    merged lane head (reiner jobqueue leg 222). For C>1 serve this recipe's
+    shape minus `--speculative`/`--num-drafts` and raise
+    max_batch_size/max_num_seqs — measured C=2 aggregate 24.76 tok/s
+    (reiner leg 223), matching the no-spec C=2 row above.
+
+    This recipe ships `speculative: true, num_drafts: 1` because it is a
+    single-sequence profile (batch 1) — exactly where the K=1 win lives.
+    The gate stays armed: it measures both modes per serve and parks in
+    Serial once width rises. Do NOT widen the batch without dropping
+    speculation — see the hard boundary above.
 
     Sampling and the thinking scaffold come from
     `kernels/gb10/qwen3.8-flash-next/MODEL.toml`, not from here: the vendor
