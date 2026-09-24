@@ -39,6 +39,15 @@ metadata:
     with `kv_cache_dtype: bf16` and `--speculative --num-drafts 1` eliminates OOM
     when KV allocates against the ~112 GB model/arena footprint, delivering 36.7 tok/s.
 
+    NVIDIA PACK SIZING (measured 2026-09-19/20, reiner GB10): the vendor pack
+    needs `gpu_memory_utilization: 0.90`, not 0.95 — 0.93 left 0.87 GB
+    MemAvailable and 0.95 was OOM-killed mid-run on the unified 128 GB. At
+    0.90 / prefill 8192 / `--num-drafts 1` it boots with a 115K-token KV pool
+    and 10.4 GB host headroom and served a 50-iteration agentic soak (prompts
+    to 25K, chunked) with zero faults. `max_seq_len` can be 32768 because
+    long prompts prefill in 8K chunks; the prefill ARENA is what OOMs
+    (~3.3 GB at 8K vs ~13 GB at 32K), not the context window.
+
     PREFILL SPEEDUP (DIRECT PREAD vs MMAP): Baseline llama.cpp relies on `mmap`,
     causing thousands of 4KB scattered OS page faults for tiny ~90-byte PLE rows
     and stalling prefill at ~300 tok/s (addressed in llama.cpp PR #28136 via
@@ -82,10 +91,20 @@ metadata:
     is already amortizing the weight reads speculation exists to amortize,
     which is why the sign flips with width.
 
-    This recipe still ships it OFF because the recipe has one setting for
-    every concurrency and the win is C=1-only. To take the C=1 win, serve
-    with `--speculative --num-drafts 1` and leave the throughput gate armed:
-    it measures both modes per serve and parks in Serial once width rises.
+    SPECULATION IS C=1-ONLY ON THIS MODEL, HARD BOUNDARY: the 512-expert mHC
+    MoE has no batched-verify arm — with 2+ active sequences the batched
+    verify declines ("no batched MoE arm for K=4... no per-row staging under
+    the highway") and requests error mid-decode. Verified 2026-09-23 on the
+    merged lane head (reiner jobqueue leg 222). For C>1 serve this recipe's
+    shape minus `--speculative`/`--num-drafts` and raise
+    max_batch_size/max_num_seqs — measured C=2 aggregate 24.76 tok/s
+    (reiner leg 223), matching the no-spec C=2 row above.
+
+    This recipe ships `speculative: true, num_drafts: 1` because it is a
+    single-sequence profile (batch 1) — exactly where the K=1 win lives.
+    The gate stays armed: it measures both modes per serve and parks in
+    Serial once width rises. Do NOT widen the batch without dropping
+    speculation — see the hard boundary above.
 
     Sampling and the thinking scaffold come from
     `kernels/gb10/qwen3.8-flash-next/MODEL.toml`, not from here: the vendor
@@ -266,11 +285,17 @@ defaults:
   port: 8889
   host: 0.0.0.0
   kernel_target: qwen3.8-flash-next
-  max_seq_len: 8192
+  # Long prompts still work at 32768 — they prefill in 8K chunks. The prefill
+  # arena is what OOMs at 32K (~13 GB), not the context window; see the
+  # NVIDIA PACK SIZING paragraph in the description.
+  max_seq_len: 32768
   max_prefill_tokens: 8192
   # bf16, not fp8 — this checkpoint ships no k/v scales. See the description.
   kv_cache_dtype: bf16
-  gpu_memory_utilization: 0.95
+  # 0.90 is the ceiling that keeps the host alive on the unified 128 GB with
+  # the NVIDIA pack resident: 0.93 left 0.87 GB MemAvailable, 0.95 was
+  # OOM-killed mid-run. Measured on reiner 2026-09-19/20.
+  gpu_memory_utilization: 0.90
   max_num_seqs: 1
   max_batch_size: 1
   speculative: true
@@ -283,4 +308,4 @@ defaults:
   # The chat template gates its whole scaffold on enable_thinking, and a bare
   # render collapses chat to a 2-token EOS. `low` keeps the budget cheap while
   # still rendering the full preamble.
-  default_chat_template_kwargs: '{"reasoning_effort":"low"}'
+  default_chat_template_kwargs: "'{\"reasoning_effort\":\"low\"}'"

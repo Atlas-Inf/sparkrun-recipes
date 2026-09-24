@@ -49,8 +49,7 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 |---|---|:---:|---|
 | `qwen3.8-27b-nvfp4` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | **DEFAULT FLAGSHIP**. 27B dense hybrid GDN + attention, NVFP4, MTP speculative decoding, FP8 KV cache, 23.59 tok/s single-stream |
 | `qwen3.8-27b-nvfp4-concurrency` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | Concurrency profile measured to beat vLLM from 1 to 128 streams on GB10 |
-| `qwen3.8-flash-next-nvfp4` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | ~180B hybrid MoE, 8K context / 8K prefill, BF16 KV, MTP K=1, 47.7 GB PLE n-gram parallel `pread` NVMe offload (~95% util, 750–800 tok/s prefill, 36.7 tok/s decode) |
-| `qwen3.8-flash-next-nvfp4-throughput` | `RadixArk/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | 8K multi-sequence profile (max_num_seqs 4), BF16 KV, optimized for batched concurrent throughput |
+| `qwen3.8-flash-next-nvfp4` | `nvidia/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | ~180B hybrid MoE on the vendor ModelOpt pack, 32K context / 8K chunked prefill, BF16 KV, MTP K=1, 47.7 GB PLE n-gram parallel `pread` NVMe offload (util 0.90 — the measured ceiling on the unified 128 GB) |
 | `qwen3.8-27b-nvfp4-agentic` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | Agentic gate config: thinking ON, BF16 head + BF16 KV, 32K context, MTP K=4, SLAi scheduler |
 | `qwen3.8-27b-nvfp4-bfcl` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | BFCL v4 agentic tool-use benchmark profile (its bars are tied to this exact config; do not add serve overrides) |
 
@@ -139,8 +138,8 @@ recipes/
 │   ├── qwen3.8-27b-nvfp4-agentic.yaml
 │   ├── qwen3.8-27b-nvfp4-concurrency.yaml
 │   ├── qwen3.8-27b-nvfp4-bfcl.yaml
-│   ├── qwen3.8-flash-next-nvfp4.yaml
-│   └── qwen3.8-flash-next-nvfp4-throughput.yaml
+│   ├── qwen3.8-27b-nvfp4-dflash2.yaml
+│   └── qwen3.8-flash-next-nvfp4.yaml
 ├── qwen3.6/
 │   ├── qwen3.6-35b-a3b-fp8-mtp.yaml
 │   ├── qwen3.6-35b-a3b-nvfp4.yaml
@@ -185,7 +184,7 @@ Sparkrun recurses through the `recipes/` directory structure; each recipe is ref
 
 Key production-validated settings encoded across recipes:
 
-- **Qwen 3.8 Flash-Next**: Uses `RadixArk/Qwen3.8-Flash-Next-NVFP4`. Binds the specialized SM121 `qwen3.8-flash-next` kernel target, BF16 KV cache (avoids clipping without scale tensors), and dynamically streams the 47.7 GB n-gram table from disk to stay under 90 GB VRAM.
+- **Qwen 3.8 Flash-Next**: Uses `nvidia/Qwen3.8-Flash-Next-NVFP4` (the vendor ModelOpt MIXED_PRECISION pack; the earlier RadixArk community mirror shares the same `qwen3.8-flash-next` kernel target). Binds the specialized SM121 target, BF16 KV cache (avoids clipping without scale tensors), and dynamically streams the 47.7 GB n-gram table from disk to stay under 90 GB VRAM.
 - **Nemotron 3.5 Lightning**: Uses `--dflash` with drafter `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4-DSpark`. Requires `ATLAS_DFLASH_OPTION_B=1`. Set `ATLAS_NO_TOOL_INJECT=1` for +15.58 BFCL accuracy boost.
 - **Mistral Small 4**: Enforces `kv_cache_dtype: bf16` to protect the MLA compressed latent.
 - **Qwen3-Coder-Next-FP8**: Configures `ssm_cache_slots: 0`, `oom_guard_mb: 1024`, and `kv_cache_dtype: bf16`.
