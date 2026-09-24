@@ -1,0 +1,95 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-27B-NVFP4
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Qwen3.8-27B (nvidia NVFP4, dense hybrid SSM+Attn) with DFlash2 block-diffusion
+    speculative decoding — the BATCHED / THROUGHPUT profile. Sibling of
+    `qwen3.8-27b-nvfp4-dflash2.yaml`, which stays single-stream
+    (max_batch_size 1) for peak per-request rate.
+
+    This profile raises max_batch_size to 16 so concurrent requests share the
+    batched DFlash verify: every request's γ-row draft block is verified in one
+    fused pass instead of N serial verifies. It needs Atlas ≥ main 2d1aab8bf
+    (PRs #52 + #60 + #64): the batched-verify envelope, stream-ordered
+    front-region copies, deferred-draft cap, and gamma-row batch admission.
+
+    MEASURED RESULT (integration lane c8b88c6, reiner job 208, GB10, Option-B
+    γ=8, util 0.70, ~500 batched verifies, zero faults):
+
+      C      aggregate tok/s
+        1         25.2
+        4         33.6
+        8         40.2
+       16         42.1
+
+    The identical code reached main via #64 (2026-09-24); the merged-main
+    re-sweep is in flight — treat the table as lane-verified until the main
+    record lands.
+
+    ★ ENV STACK — no `env:` key exists in the recipe struct; export before
+    serve (same contract as the single-stream sibling):
+
+      ATLAS_DFLASH_OPTION_B=1      # paged Option-B drafter; default since
+                                 # atlas#33 — set explicitly only on images
+                                 # that predate it
+      ATLAS_DFLASH_STEP_TIMING=1   # per-step propose/verify timing to stderr
+      ATLAS_MTP_ACCEPT_DEBUG=1     # per-verify acceptance lines; this is how
+                                 # you confirm the batched path engaged —
+                                 # look for K=γ verify lines covering every
+                                 # active request, not one per request
+
+    ATLAS_DFLASH_PROPOSE_LANES: leave UNSET. Multi-lane batched propose is
+    merged (#64) and functionally correct, but measured not-yet-a-perf-win —
+    the default single lane is the validated config.
+
+    WHEN NOT TO USE THIS. For a single interactive user the single-stream
+    sibling is the right profile — batching adds per-step workspace it never
+    amortizes at C=1. For long agentic trajectories see
+    `qwen3.8-27b-nvfp4-agentic.yaml`.
+
+    num_drafts deliberately absent (same as sibling): --dflash derives
+    num_drafts = γ-1 = 7; an explicit --num-drafts trips the flag validator.
+
+    enable_prefix_caching stays FALSE — DFlash + prefix caching reported an
+    illegal-address fault on GB10 (SM12.x). Greedy-diff verification against
+    a non-DFlash baseline is required before trusting multi-turn cache hits.
+
+    NOTE on observing acceptance: thinking defaults ON; the scheduler
+    serializes inside <think> unless ATLAS_DFLASH_SPEC_THINK=1 — a probe that
+    never exits <think> reports serial=1.00 mean_na=0.000. Expected, not a
+    DFlash failure.
+  maintainer: Atlas
+  category: agent
+  model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
+  model_dtype: nvfp4
+  quantization: "NVFP4 (mixed precision — FP8 linear_attn/self_attn, NVFP4 MLP)"
+  kv_dtype: bf16
+  updated: "2026-09-24"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 8192
+  max_batch_size: 16
+  gpu_memory_utilization: 0.70
+  kv_cache_dtype: bf16
+  lm_head_dtype: bf16
+  kv_high_precision_layers: auto
+  scheduling_policy: slai
+  enable_prefix_caching: false
+  ssm_cache_slots: 256
+  ssm_checkpoint_interval: 16
+  speculative: false
+  dflash: true
+  draft_model: incoai/Qwen3.8-27B-DFlash2
+  dflash_gamma: 8
+  # num_drafts intentionally absent: --dflash derives it as γ-1 (=7), and an
+  # explicit --num-drafts trips the flag validator on current images.
+  dflash_window_size: 4096
+  mtp_gate: force
+  gdn_fused_norm: true
+  video_allow_ffmpeg: true
