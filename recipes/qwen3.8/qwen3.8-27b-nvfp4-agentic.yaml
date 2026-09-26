@@ -34,6 +34,17 @@ metadata:
     different gate. Do not cross-use them: the two differ in thinking, KV/head
     precision, scheduler, SSM cache geometry AND memory budget.
 
+    MLPERF EDGE-AGENTIC PERF LEG (measured 2026-09-26, reiner GB10, Atlas
+    main a83b05c16 = atlas#86 + #96): the endpoints `agentic-coding-perf-2.5h`
+    leg served with THESE defaults plus the leg's required --disable-thinking
+    (reasoning off; max_model_len 32768 as pinned) — 1007/1007 turns, 0
+    failed, 0 missing, 107 min, score 0.6217; compliance checks temperature
+    0 / seed 42 / single-stream / no dropped turns all pass. This is the 27B
+    profile for multi-turn agentic serving: the DFlash2 recipes lose their
+    drafter context on prefix-cache hits and their drafts are not
+    grammar-masked in tool calls (atlas#102), so they cannot hold this
+    leg's 4 h budget.
+
     PROVENANCE OF THE FLAGS BELOW — read before changing any of them.
 
     Every value here is pinned to ONE measured run, not to prose:
@@ -135,7 +146,7 @@ metadata:
   model_dtype: nvfp4
   quantization: NVFP4 (modelopt MIXED_PRECISION — FP8 linear_attn projections + NVFP4 MLP)
   kv_dtype: bf16
-  updated: "2026-08-15"
+  updated: "2026-09-26"
 
 defaults:
   host: 0.0.0.0
