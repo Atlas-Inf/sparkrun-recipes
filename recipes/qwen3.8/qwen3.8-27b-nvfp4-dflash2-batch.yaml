@@ -11,31 +11,40 @@ metadata:
     `qwen3.8-27b-nvfp4-dflash2.yaml`, which stays single-stream
     (max_batch_size 1) for peak per-request rate.
 
-    This profile raises max_batch_size to 16 so concurrent requests share the
-    batched DFlash verify: every request's γ-row draft block is verified in one
-    fused pass instead of N serial verifies. It needs Atlas ≥ main 2d1aab8bf
-    (PRs #52 + #60 + #64): the batched-verify envelope, stream-ordered
-    front-region copies, deferred-draft cap, and gamma-row batch admission.
+    This profile raises max_batch_size to 16 so concurrent requests share one
+    batched DFlash2 step: a single B×γ drafter forward proposes for every
+    active request (atlas#86 batched propose: one weight read for all
+    sequences instead of one per sequence) and one fused verify checks all of
+    them (up to 16 × (γ+1) = 128 rows per pass since atlas#86 raised
+    VERIFY_ROW_CAP from 96 to 128). It needs an Atlas image that contains
+    atlas#86.
 
-    MEASURED RESULT (integration lane c8b88c6, reiner job 208, GB10, Option-B
-    γ=8, util 0.70, ~500 batched verifies, zero faults):
+    MEASURED RESULT (reiner job 405, GB10, `spark benchmark run
+    concurrency-sweep` gate instrument: C 1/4/8/16, ISL 512, OSL 320;
+    γ=8, Option B, util 0.70, bf16 KV, thinking off; 2 interleaved reps,
+    0 request errors, 0 fallbacks):
 
-      C      aggregate tok/s
-        1         25.2
-        4         33.6
-        8         40.2
-       16         42.1
+      C      batched propose (default)   serial propose (=0 rollback)
+        1         23.4 / 23.6                 23.5 / 23.5
+        4         43.5 / 46.3                 40.3 / 36.9
+        8         66.5 / 65.4                 44.5 / 47.0
+       16         75.0 / 75.2                 54.0 / 53.6
 
-    The identical code reached main via #64 (2026-09-24); the merged-main
-    re-sweep is in flight — treat the table as lane-verified until the main
-    record lands.
+    Every rung clears the 27B concurrency-gate floors (17.0 / 35.0 / 52.0 /
+    73.5 aggregate tok/s — MTP-derived, the gate keys baselines by
+    checkpoint). Images before atlas#86 measured 25.2 / 33.6 / 40.2 / 42.1
+    (serial propose, lane c8b88c6, job 208).
 
     ★ ENV STACK — no `env:` key exists in the recipe struct; export before
     serve (same contract as the single-stream sibling):
 
-      ATLAS_DFLASH_OPTION_B=1      # paged Option-B drafter; default since
-                                 # atlas#33 — set explicitly only on images
-                                 # that predate it
+      ATLAS_DFLASH_OPTION_B        # paged Option-B drafter — ON by default
+                                 # since atlas#86 (=0 restores the legacy
+                                 # contiguous path, which cannot batch);
+                                 # older images need =1 exported
+      ATLAS_DFLASH_BATCHED_PROPOSE # batched B×γ propose — ON by default since
+                                 # atlas#86 when Option B + one lane; =0 is
+                                 # the rollback to per-sequence propose
       ATLAS_DFLASH_STEP_TIMING=1   # per-step propose/verify timing to stderr
       ATLAS_MTP_ACCEPT_DEBUG=1     # per-verify acceptance lines; this is how
                                  # you confirm the batched path engaged —
@@ -54,9 +63,12 @@ metadata:
     num_drafts deliberately absent (same as sibling): --dflash derives
     num_drafts = γ-1 = 7; an explicit --num-drafts trips the flag validator.
 
-    enable_prefix_caching stays FALSE — DFlash + prefix caching reported an
-    illegal-address fault on GB10 (SM12.x). Greedy-diff verification against
-    a non-DFlash baseline is required before trusting multi-turn cache hits.
+    enable_prefix_caching stays FALSE — see the single-stream sibling for the
+    measured reason: since atlas#96 cache hits are output-correct, but the
+    DFlash2 drafter's context is not restored on a hit, so acceptance
+    collapses to ~0 on cached turns. Multi-turn agentic serving belongs on
+    `qwen3.8-27b-nvfp4-agentic.yaml` (MTP + prefix caching). The batched
+    path with caching on is not yet measured.
 
     NOTE on observing acceptance: thinking defaults ON; the scheduler
     serializes inside <think> unless ATLAS_DFLASH_SPEC_THINK=1 — a probe that
@@ -68,7 +80,7 @@ metadata:
   model_dtype: nvfp4
   quantization: "NVFP4 (mixed precision — FP8 linear_attn/self_attn, NVFP4 MLP)"
   kv_dtype: bf16
-  updated: "2026-09-24"
+  updated: "2026-09-26"
 
 defaults:
   host: 0.0.0.0
