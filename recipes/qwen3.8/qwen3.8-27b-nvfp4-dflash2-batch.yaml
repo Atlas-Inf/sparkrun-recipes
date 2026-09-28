@@ -19,21 +19,34 @@ metadata:
     VERIFY_ROW_CAP from 96 to 128). It needs an Atlas image that contains
     atlas#86.
 
-    MEASURED RESULT (reiner job 405, GB10, `spark benchmark run
-    concurrency-sweep` gate instrument: C 1/4/8/16, ISL 512, OSL 320;
-    γ=8, Option B, util 0.70, bf16 KV, thinking off; 2 interleaved reps,
-    0 request errors, 0 fallbacks):
+    MEASURED RESULT on current main (atlas 10d4ec718, the code in image
+    3fcf8ff; reiner jobs 610 611 611y 611zz 623 624 625z, 2026-09-27/28,
+    15 runs of `spark benchmark run concurrency-sweep`: C 1/4/8/16,
+    ISL 512, OSL 320; γ=8, Option B, util 0.70, bf16 KV, thinking off;
+    0 request errors):
 
-      C      batched propose (default)   serial propose (=0 rollback)
-        1         23.4 / 23.6                 23.5 / 23.5
-        4         43.5 / 46.3                 40.3 / 36.9
-        8         66.5 / 65.4                 44.5 / 47.0
-       16         75.0 / 75.2                 54.0 / 53.6
+      C      mean    range          gate floor
+        1    23.2    23.1 – 23.3    17.0
+        4    46.6    43.2 – 48.1    35.0
+        8    61.2    56.5 – 64.3    52.0
+       16    69.3    61.7 – 74.7    73.5   ← below the floor
 
-    Every rung clears the 27B concurrency-gate floors (17.0 / 35.0 / 52.0 /
-    73.5 aggregate tok/s — MTP-derived, the gate keys baselines by
-    checkpoint). Images before atlas#86 measured 25.2 / 33.6 / 40.2 / 42.1
-    (serial propose, lane c8b88c6, job 208).
+    C=16 misses the 27B floor (MTP-derived; the gate keys baselines by
+    checkpoint) since atlas#96. #96 moved the dense-FFN prefill arm from
+    W4A4 NVFP4-MMQ to W4A16 for prefill precision (#95), and DFlash verify
+    rows ride that arm: verify at 16 sequences went from 324 to 367 ms
+    (job 625z). The #86 branch measured 75.0 / 75.2 at C=16 before #96
+    (job 405). The C=16 aggregate is noisy because mean draft acceptance
+    moves 3.0–3.2 between runs of the same binary.
+
+    Throughput-first deployments can export ATLAS_FFN_NVFP4_MMQ=1 to
+    restore the pre-#96 FFN arm. Job 625z measured C=16 72.9 / 80.9, with
+    greedy output identical on its probes. The cost is #95's prefill
+    precision: +0.5–0.8 % perplexity and chunk-dependent prefill.
+    atlas#127 (batched propose without pipeline drains, C=16 75.7 / 75.8 in
+    job 611y) is the pending default-path fix. Images before atlas#86
+    measured 25.2 / 33.6 / 40.2 / 42.1 (serial propose, lane c8b88c6,
+    job 208).
 
     ★ ENV STACK — no `env:` key exists in the recipe struct; export before
     serve (same contract as the single-stream sibling):
