@@ -1,11 +1,10 @@
 recipe_version: "2"
 model: nvidia/Qwen3.8-Flash-Next-NVFP4
 runtime: atlas
-# DRAFT. Needs the Qwen3.8-Flash-Next TP=2 train on Atlas main (integration pathway C1-C3 + the GLM RDMA-pair
-# infrastructure). Until it lands, :latest does not carry it; the measurements below are from an engine built
-# from main 7ffd183f + Enntity upstream/qwen38-flash-next-20261006 + sparkqwen/atlas-20261010-rc16 + the
-# atlas-rdma link-address GID fix + the startup cuBLASLt agreement (local branch integ/qwen38-rc16-tp2fixes
-# 25a7545f5; the gates ran on 2542d6e6e, the same engine without the two fixes).
+# Needs Atlas-Inf/atlas#174 (qwen3.8-flash-next TP=EP=2) on main and a :latest image built after it; merge
+# this recipe after both. The measurements below are from that PR's tree (25a7545f5: main 7ffd183f + Enntity
+# upstream/qwen38-flash-next-20261006 + sparkqwen/atlas-20261010-rc16 + the RDMA link-address GID fix + the
+# startup cuBLASLt agreement); the gates ran on 2542d6e6e, the same engine without the two fixes.
 container: azeezish/atlas-gb10:latest
 min_nodes: 2
 max_nodes: 2
