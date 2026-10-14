@@ -4,7 +4,8 @@ runtime: atlas
 # DRAFT. Needs the Qwen3.8-Flash-Next TP=2 train on Atlas main (integration pathway C1-C3 + the GLM RDMA-pair
 # infrastructure). Until it lands, :latest does not carry it; the measurements below are from an engine built
 # from main 7ffd183f + Enntity upstream/qwen38-flash-next-20261006 + sparkqwen/atlas-20261010-rc16 + the
-# atlas-rdma link-address GID fix (local branch integ/qwen38-rc16-gidfix 24788fe16).
+# atlas-rdma link-address GID fix + the startup cuBLASLt agreement (local branch integ/qwen38-rc16-tp2fixes
+# 25a7545f5; the gates ran on 2542d6e6e, the same engine without the two fixes).
 container: azeezish/atlas-gb10:latest
 min_nodes: 2
 max_nodes: 2
@@ -20,33 +21,51 @@ metadata:
     run unchanged on Atlas main.
 
     EXACT: with speculation (MTP, up to 7 drafts) and prefix caching on, greedy
-    output at 1, 4 and 8 concurrent requests is identical to one-at-a-time decode
-    with both off (sparkqwen bench/greedy_eq.py, 8 prompts, thinking low: 8/8 at
-    C1, C4, C8). TP=2 output is not bit-identical to one GB10 (BF16 rounding of the
+    output at 1, 4 and 8 concurrent requests, and behind a ~4.4K-token cached
+    prefix, is identical to one-at-a-time decode with both off (sparkqwen
+    bench/greedy_eq.py, 8 prompts, thinking low: 8/8 in every case). The reference
+    texts hash 8199ce ... 1c6136, the same as SparkQwen's RC16 receipts on their
+    pair. TP=2 output is not bit-identical to one GB10 (BF16 rounding of the
     tensor-parallel sums).
 
-    MEASURED 2026-10-14 on one pair (reiner + spark2, one RDMA rail per node),
-    single session, served name nvidia/Qwen3.8-Flash-Next-NVFP4:
-      MLPerf edge ST-995 (bfcl-subset --url, no overrides): overall 85.63,
-        normalized 84.87 (bars 82.72 / 81.65), 7,331 s. One GB10 on main:
-        86.23 / 86.81, 13,245 s. The normalized gap is the hallucination
-        category (94.51 -> 89.58); whether it comes from TP numerics or the
-        profile's numerics switches is being split.
+    MEASURED 2026-10-14 on one pair (reiner + spark2, one RDMA rail per node,
+    the same libcublasLt 13.0.2.14 on both ranks), single session per number,
+    served name nvidia/Qwen3.8-Flash-Next-NVFP4:
+      MLPerf edge ST-995 (bfcl-subset --url, no overrides): overall 85.83,
+        normalized 85.48 (bars 82.72 / 81.65), 7,295 s. One GB10 on main:
+        86.23 / 86.81, 13,245 s. The gap is the hallucination category
+        (94.51 -> 89.58, about 5 of 112 samples).
       MLPerf edge agentic 2.5 h leg (thinking off, C=1): 1007/1007, score
-        0.5086, 2,243 s, TPOT median 25.9 ms, TTFT median 494 ms. One GB10 on
+        0.5125, 2,233 s, TPOT median 26.0 ms, TTFT median 492 ms. One GB10 on
         main: 0.5053, 4,217 s, 48.2 ms, 990 ms.
-      sq_bench (thinking low): C1 decode prose/code/JSON 54.6 / 67.3 / 64.2
-        tok/s; aggregate C1/C2/C4/C8 48.5 / 82.6 / 126.9 / 191.1 tok/s; cold
-        TTFT 2K/8K/16K/28K 0.80 / 2.23 / 4.38 / 7.79 s; warm follow-up 0.19-0.21 s.
+      sq_bench (thinking low): C1 decode prose/code/JSON 53.1 / 68.6 / 63.3
+        tok/s; aggregate C1/C2/C4/C8 49.6 / 84.2 / 129.3 / 193.4 tok/s; cold
+        TTFT 2K/8K/16K/28K 0.81 / 2.23 / 4.36 / 7.76 s; warm follow-up 0.18-0.20 s.
       KV pool: 3,112,608 tokens at util 0.88 (prefill MoE reads the checkpoint's
         own planes; no K-major duplicate). tool_probe 21/21. 0 faults on both ranks.
+      4 x 262K variant (max_num_seqs/max_batch_size 4, max_model_len 262144):
+        77K-token needle correct, TTFT 22.3 s, 54.3 tok/s; warm follow-up 0.3 s.
+        (tool_probe and the 262K needle ran before the cuBLAS was matched.)
+
+    NUMERICS POLICY. This profile keeps SparkQwen's tensor-core MoE and mHC
+    decode (ATLAS_QWEN4EXP_MOE_TC, _HC_MMA, _MOE_NO_CLAMP, _HC_STAGE_FIT), which
+    set a new numerics baseline. Dropping those four and ATLAS_LOOP_STEER keeps
+    main's numerics, stays exact, and measured ST-995 85.53 / 86.14, the same
+    TTFT, C1 decode 51.8 / 65.2 / 63.3 tok/s and C4/C8 aggregate 113.2 / 160.9
+    tok/s (vs 129.3 / 193.4).
 
     FABRIC. Each Spark needs an IPv4 address on the cable's netdev. If that netdev
     carries more than one IPv4 address (e.g. a LAN address too), the engine picks
     the RoCE v2 GID on the address the peer reached it at; ATLAS_RDMA_GID overrides.
     NCCL's bootstrap socket must sit on a netdev whose first IPv4 address the peer
-    can reach (NCCL_SOCKET_IFNAME). Same binary, profile and util on both ranks:
-    the ranks refuse to start otherwise.
+    can reach (NCCL_SOCKET_IFNAME). One rail is enough: striping over both PCIe
+    halves of the port measured no meaningful gain.
+
+    BOTH RANKS MUST LOAD THE SAME cuBLAS (the image's CUDA 13.0). With 13.1 on
+    one rank and 13.0 on the other, cached-prefix output stopped matching the
+    uncached output; the engine now refuses to start ranks on different
+    libcublasLt versions. Same binary, profile and util on both ranks: the ranks
+    refuse to start otherwise.
 
     BF16 KV only: the QSA indexer requires it.
   maintainer: atlas-inf
