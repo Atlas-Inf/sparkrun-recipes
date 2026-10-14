@@ -1,0 +1,185 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-Flash-Next-NVFP4
+runtime: atlas
+# DRAFT. Needs the Qwen3.8-Flash-Next TP=2 train on Atlas main (integration pathway C1-C3 + the GLM RDMA-pair
+# infrastructure). Until it lands, :latest does not carry it; the measurements below are from an engine built
+# from main 7ffd183f + Enntity upstream/qwen38-flash-next-20261006 + sparkqwen/atlas-20261010-rc16 + the
+# atlas-rdma link-address GID fix (local branch integ/qwen38-rc16-gidfix 24788fe16).
+container: azeezish/atlas-gb10:latest
+min_nodes: 2
+max_nodes: 2
+
+metadata:
+  description: |
+    Qwen3.8-Flash-Next (`model_type: qwen4_exp`) on TWO GB10s, tensor and expert
+    parallel (TP=EP=2): Gated DeltaNet and attention sharded, the 512 routed experts
+    split across the pair, mHC / PLE / QSA indexer / LM head replicated. The pair
+    talks over one ConnectX-7 cable: Atlas's own RDMA all-reduce, one-shot small
+    all-reduce and command ring carry the per-token traffic; NCCL is the fallback.
+    Engine options and the serve line are SparkQwen's RC16 8x32k profile (Enntity),
+    run unchanged on Atlas main.
+
+    EXACT: with speculation (MTP, up to 7 drafts) and prefix caching on, greedy
+    output at 1, 4 and 8 concurrent requests is identical to one-at-a-time decode
+    with both off (sparkqwen bench/greedy_eq.py, 8 prompts, thinking low: 8/8 at
+    C1, C4, C8). TP=2 output is not bit-identical to one GB10 (BF16 rounding of the
+    tensor-parallel sums).
+
+    MEASURED 2026-10-14 on one pair (reiner + spark2, one RDMA rail per node),
+    single session, served name nvidia/Qwen3.8-Flash-Next-NVFP4:
+      MLPerf edge ST-995 (bfcl-subset --url, no overrides): overall 85.63,
+        normalized 84.87 (bars 82.72 / 81.65), 7,331 s. One GB10 on main:
+        86.23 / 86.81, 13,245 s. The normalized gap is the hallucination
+        category (94.51 -> 89.58); whether it comes from TP numerics or the
+        profile's numerics switches is being split.
+      MLPerf edge agentic 2.5 h leg (thinking off, C=1): 1007/1007, score
+        0.5086, 2,243 s, TPOT median 25.9 ms, TTFT median 494 ms. One GB10 on
+        main: 0.5053, 4,217 s, 48.2 ms, 990 ms.
+      sq_bench (thinking low): C1 decode prose/code/JSON 54.6 / 67.3 / 64.2
+        tok/s; aggregate C1/C2/C4/C8 48.5 / 82.6 / 126.9 / 191.1 tok/s; cold
+        TTFT 2K/8K/16K/28K 0.80 / 2.23 / 4.38 / 7.79 s; warm follow-up 0.19-0.21 s.
+      KV pool: 3,112,608 tokens at util 0.88 (prefill MoE reads the checkpoint's
+        own planes; no K-major duplicate). tool_probe 21/21. 0 faults on both ranks.
+
+    FABRIC. Each Spark needs an IPv4 address on the cable's netdev. If that netdev
+    carries more than one IPv4 address (e.g. a LAN address too), the engine picks
+    the RoCE v2 GID on the address the peer reached it at; ATLAS_RDMA_GID overrides.
+    NCCL's bootstrap socket must sit on a netdev whose first IPv4 address the peer
+    can reach (NCCL_SOCKET_IFNAME). Same binary, profile and util on both ranks:
+    the ranks refuse to start otherwise.
+
+    BF16 KV only: the QSA indexer requires it.
+  maintainer: atlas-inf
+  category: general
+  model_params: 180B
+  model_dtype: nvfp4
+  quantization: nvfp4
+  kv_dtype: bf16
+
+defaults:
+  port: 8889
+  host: 0.0.0.0
+  kernel_target: qwen3.8-flash-next
+  tensor_parallel: 2
+  ep_size: 2
+  max_model_len: 32768
+  max_prefill_tokens: 16384
+  kv_cache_dtype: bf16
+  gpu_memory_utilization: 0.88
+  oom_guard_mb: 4096
+  max_num_seqs: 8
+  max_batch_size: 8
+  speculative: true
+  num_drafts: 7
+  enable_prefix_caching: true
+  fast_load_prefetch_shards: true
+  default_chat_template_kwargs: "'{\"reasoning_effort\":\"low\"}'"
+
+env:
+  ATLAS_EP_PROTOCOL: "v2"
+  ATLAS_RDMA_ALLREDUCE: "1"
+  ATLAS_RDMA_ONESHOT: "1"
+  ATLAS_RDMA_PAIR_CHAIN: "1"
+  ATLAS_GLM_CMD_RDMA: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH_COLLECTIVES: "1"
+  ATLAS_QWEN4EXP_HC_FAST: "1"
+  ATLAS_QWEN4EXP_LMHEAD_SPLIT: "1"
+  ATLAS_QWEN4EXP_LMHEAD_BATCHM: "1"
+  ATLAS_QWEN4EXP_EXACT_VERIFY: "1"
+  ATLAS_QWEN4EXP_MOE_FAST: "1"
+  ATLAS_QWEN4EXP_DECODE_FUSE: "1"
+  ATLAS_QWEN4EXP_BATCH_FAST: "1"
+  ATLAS_QWEN4EXP_MTP_DEPTH: "7"
+  ATLAS_MTP_SINGLE_DEPTH_ADAPT: "1"
+  ATLAS_QWEN4EXP_DRAFT_HEAD_NVFP4: "1"
+  ATLAS_QWEN4EXP_PREFILL_MOE: "1"
+  ATLAS_QWEN4EXP_PREFILL_GDN: "1"
+  ATLAS_QWEN4EXP_PREFILL_QSA_SCORE: "1"
+  ATLAS_QWEN4EXP_PREFILL_HC: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH_WIDE: "1"
+  ATLAS_QWEN4EXP_BATCH_SMALL: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP: "1"
+  ATLAS_QWEN4EXP_PREFILL_MOE_W2: "1"
+  ATLAS_LT_KCHAIN_PIN: "1"
+  ATLAS_QWEN4EXP_PREFILL_BA_ROWS: "1"
+  ATLAS_QWEN4EXP_PREFILL_FP8_W2: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_SHARED: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_PIPE: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_RS_PIPE: "1"
+  ATLAS_QWEN4EXP_PREFILL_QSA_SPLIT: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_ROUTE: "1"
+  ATLAS_QWEN4EXP_PREFILL_MIDCHUNK_CKPT: "1"
+  ATLAS_QWEN4EXP_CKPT_AUX_SHARE: "1"
+  ATLAS_QWEN4EXP_AUX_PINNED: "1"
+  ATLAS_QWEN4EXP_PREFILL_HOST_IDS: "1"
+  ATLAS_QWEN4EXP_QSA_REUSE: "1"
+  ATLAS_QWEN4EXP_SP_PREALLOC: "1"
+  ATLAS_PLE_WARM_BG: "1"
+  ATLAS_MTP_MAX_SEQS: "8"
+  ATLAS_MTP_GATE_FORCE: "1"
+  ATLAS_MTP_DYNAMIC_DEPTH: "1"
+  ATLAS_MTP_DEEP_MAX_SEQS: "2"
+  ATLAS_QWEN4EXP_MTP_KV_KEEP: "1"
+  ATLAS_NO_MTP_DCUT: "1"
+  ATLAS_QWEN4EXP_MTP_DRAFT_TP: "1"
+  ATLAS_PLE_NVME_KEEPALIVE_MS: "10"
+  ATLAS_PLE_FAULT_POOL: "1"
+  ATLAS_VERIFY_PICK_PAR: "1"
+  ATLAS_QWEN4EXP_HC_WIDE: "1"
+  ATLAS_QWEN4EXP_MTP_GROUPED_NORM: "1"
+  ATLAS_GLM_ZERO_ROWS: "1"
+  ATLAS_QWEN4EXP_EOS_BAN: "1"
+  ATLAS_QWEN4EXP_QKV_ROWS_2D: "1"
+  ATLAS_QWEN4EXP_VERIFY_BT_PINNED: "1"
+  ATLAS_QWEN4EXP_EXACT_DEFER: "1"
+  ATLAS_QWEN4EXP_QSA_KEY_ONLY: "1"
+  ATLAS_QWEN4EXP_QSA_COMMIT_ROWS: "1"
+  ATLAS_CONTENT_LOOP_WATCHDOG: "1"
+  ATLAS_CONTENT_LOOP_MIN_REPEATS: "32"
+  ATLAS_LOOP_STEER: "1"
+  ATLAS_QWEN4EXP_FINISH_LEAF: "1"
+  ATLAS_QWEN4EXP_QSA_TOPK_WIDE: "1"
+  ATLAS_QWEN4EXP_QSA_DECODE_ROWS: "1"
+  ATLAS_QWEN4EXP_MOE_TC: "1"
+  ATLAS_QWEN4EXP_MOE_NO_CLAMP: "1"
+  ATLAS_QWEN4EXP_HC_STAGE_FIT: "1"
+  ATLAS_QWEN4EXP_HC_MMA: "1"
+  ATLAS_QWEN4EXP_QSA_SPARE_MAX: "288"
+  ATLAS_QWEN4EXP_PREFILL_ROWINV: "1"
+  ATLAS_QWEN4EXP_GDN_COMMIT_FUSE: "1"
+  ATLAS_QWEN4EXP_QSA_COMMIT_TABLE: "1"
+  ATLAS_QWEN4EXP_KV_LOOKAHEAD: "64"
+  ATLAS_QWEN4EXP_PREFILL_MULTI: "1"
+  ATLAS_PREFILL_CODISPATCH: "1"
+  ATLAS_PREFILL_CODISPATCH_WINDOW_MS: "20"
+  ATLAS_PREFILL_CODISPATCH_SETTLE_MS: "3"
+  ATLAS_QWEN4EXP_PREFILL_MOE_NODUP: "1"
+  ATLAS_QWEN4EXP_LMHEAD_SPLIT_VERIFY: "1"
+  ATLAS_RDMA_ONESHOT_MAX: "8388608"
+  ATLAS_MTP_DFLASH_CTX_SCOPED: "1"
+  ATLAS_QWEN4EXP_ROWS32_TILE: "1"
+  ATLAS_QWEN4EXP_PREFILL_MULTI_CACHED: "1"
+  ATLAS_QWEN4EXP_W4_ROWS: "1"
+  ATLAS_QWEN4EXP_W4_ROWS_WIDE: "1"
+  ATLAS_QWEN4EXP_PREFILL_GEMM_RASTER: "1"
+  NCCL_ALGO: "Ring"
+  NCCL_BUFFSIZE: "33554432"
+  NCCL_CROSS_NIC: "0"
+  NCCL_CUMEM_ENABLE: "0"
+  NCCL_CUMEM_HOST_ENABLE: "0"
+  NCCL_DEBUG: "WARN"
+  NCCL_DMABUF_ENABLE: "0"
+  NCCL_IB_ADDR_FAMILY: "AF_INET"
+  NCCL_IB_DISABLE: "0"
+  NCCL_IB_RETRY_CNT: "7"
+  NCCL_IB_ROCE_VERSION_NUM: "2"
+  NCCL_IB_TIMEOUT: "22"
+  NCCL_MAX_NCHANNELS: "2"
+  NCCL_MIN_NCHANNELS: "1"
+  NCCL_NET: "IB"
+  NCCL_NET_GDR_C2C: "0"
+  NCCL_NET_GDR_LEVEL: "0"
+  NCCL_NVLS_ENABLE: "0"
+  NCCL_PROTO: "Simple"
+  RUST_LOG: "info"
