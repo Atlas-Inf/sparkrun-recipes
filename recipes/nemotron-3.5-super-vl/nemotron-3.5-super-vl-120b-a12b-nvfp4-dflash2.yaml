@@ -1,0 +1,71 @@
+recipe_version: "2"
+model: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    Nemotron 3.5 Super VL 120B-A12B (nemotron_h_omni) at NVFP4 with the
+    DFlash2 drafter at gamma 8 on a single GB10.
+
+    88 layers: 40 Mamba-2, 40 LatentMoE (512 experts, top-22, latent 1024),
+    8 GQA attention; ~12.8B active parameters, ~70 GB resident.
+
+    Formats as served: NVFP4 routed and shared experts, FP8 Mamba
+    projections, native FP8 attention q/k/v/o (no BF16 dequant), NVFP4
+    LM head, BF16 KV cache. Drafter: 5-layer block-diffusion DFlash2 head
+    (2-tap grouped dynamic conv), its own NVFP4 LM head. The drafter's
+    LiLiCorr candidate re-ranker ships in the checkpoint but is not
+    implemented, so drafts use the drafter's argmax.
+
+    Requires an atlas-gb10 image built from main with Atlas-Inf/atlas#175.
+    Verified on GB10 through scripts/serve-nemotron-gb10.sh
+    (equivalent flags to `defaults:` below; the script binds 127.0.0.1:8391):
+      ST-995 (bfcl-subset, n=995, temp 0)   88.04 overall / 85.75 normalized
+      speculation identity, g8 vs off      995/995 identical on ST-995;
+                                           15/15 on the golden prompt set
+      MLPerf agentic (2.5 h, 1007 turns)   0.6084-0.6088 at g8
+                                           (0.6074 spec-off; 978/1007 turns
+                                           identical — known limit: the verify
+                                           path saves fewer prefix-cache SSM
+                                           checkpoints than serial decode)
+      decode, spec off                     20.4 tok/s ~1K ctx, 18.6 at ~17K
+      decode, g8 (agentic traffic)         ~28-37 tok/s
+
+    Thinking is disabled (atlas mode). `--reference-mode` scores higher on
+    agentic (0.630) but 84.82 on ST-995, so it is not the default here.
+
+    Single sequence only: max_num_seqs / max_batch_size 1 are what was
+    verified. Prefix caching is ON: the server prints a generic DFlash +
+    prefix-cache warning, but ST-995 with the cache on vs off was identical
+    on this model, and agentic legs must run cache-on.
+
+    Same model on Strix Halo (Windows): not a sparkrun runtime; use
+    `scripts/serve-nemotron-amd.ps1` in the Atlas repo (ST-995 88.14 off and
+    g8, agentic 0.611, 18.4 / 27.5 tok/s off / g8).
+  maintainer: atlas-inf
+  category: agent
+  model_params: 120B-A12B (40 Mamba-2 + 40 LatentMoE + 8 attention)
+  model_dtype: nvfp4
+  quantization: "NVFP4 experts + LM head, FP8 Mamba and attention"
+  kv_dtype: bf16
+  updated: "2026-10-15"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 32768
+  max_prefill_tokens: 8192
+  kv_cache_dtype: bf16
+  # 0.85 is the verified value: ~80 GB Atlas-owned at boot with the drafter.
+  gpu_memory_utilization: 0.85
+  max_num_seqs: 1
+  max_batch_size: 1
+  enable_prefix_caching: true
+  disable_thinking: true
+  dflash: true
+  draft_model: nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4-LiLiCorr
+  # 8, not 3: with the union-table MoE verify GEMV, g8 beats g3 on agentic
+  # traffic (36.8 vs 28.7 tok/s) and output is identical to spec-off.
+  dflash_gamma: 8
