@@ -99,6 +99,7 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 
 | Subfamily | Recipe | Model Checkpoint | Topology | Description |
 |---|---|---|:---:|---|
+| **Nemotron-3.5 Super VL** | `nemotron-3.5-super-vl-120b-a12b-nvfp4-dflash2` | `nvidia/NVIDIA-Nemotron-3.5-Super-VL-120B-A12B-NVFP4` | Single GB10 | **NEW**. 120B / 12B active Mamba-2 + LatentMoE + vision, NVIDIA LiLiCorr drafter at γ8 (DFlash); ST-995 88.0, ~28 tok/s decode. Needs atlas#175 |
 | **Nemotron-3.5 Lightning** | `nemotron-3.5-lightning-30b-a3b-nvfp4-dspark` | `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` | Single GB10 | **NEW**. Mamba-2 SSM + Attention + MoE with 6-layer DSpark drafter (gamma=4 / K=3 verify), sub-10ms decode |
 | **Nemotron-3 Nano** | `nemotron-3-nano-30b-a3b-nvfp4` | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4` | Single GB10 | 30B / 3B active Mamba-2 hybrid MoE |
 | **Nemotron-3 Super** | `nemotron-3-super-120b-a12b-nvfp4` | `nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4` | Single GB10 | 120B / 12B active hybrid MoE |
@@ -162,6 +163,8 @@ recipes/
 ├── diffusion-gemma/
 │   ├── diffusion-gemma-bf16.yaml
 │   └── diffusion-gemma-fp8-dynamic.yaml
+├── nemotron-3.5-super-vl/
+│   └── nemotron-3.5-super-vl-120b-a12b-nvfp4-dflash2.yaml
 ├── nemotron-3.5-lightning/
 │   └── nemotron-3.5-lightning-30b-a3b-nvfp4-dspark.yaml
 ├── nemotron-3-nano/
