@@ -4,7 +4,8 @@ runtime: atlas
 # Needs Atlas-Inf/atlas#174 (qwen3.8-flash-next TP=EP=2) on main and a :latest image built after it; merge
 # this recipe after both. The measurements below are from that PR's tree (25a7545f5: main 7ffd183f + Enntity
 # upstream/qwen38-flash-next-20261006 + sparkqwen/atlas-20261010-rc16 + the RDMA link-address GID fix + the
-# startup cuBLASLt agreement); the gates ran on 2542d6e6e, the same engine without the two fixes.
+# startup cuBLASLt agreement); the gates ran on 2542d6e6e, the same engine without the two fixes. This file
+# was launched through sparkrun on the PR head e7d951ccf (image built from it); see SPARKRUN below.
 container: azeezish/atlas-gb10:latest
 min_nodes: 2
 max_nodes: 2
@@ -46,6 +47,14 @@ metadata:
         77K-token needle correct, TTFT 22.3 s, 54.3 tok/s; warm follow-up 0.3 s.
         (tool_probe and the 262K needle ran before the cuBLAS was matched.)
 
+    SPARKRUN (2026-10-16, this file unchanged, `sparkrun run ... --cluster <pair>`,
+    image of #174 head e7d951ccf, one session): greedy output at C1 and C8 and
+    behind the cached prefix at C4 is 8/8 identical to the reference hashes above;
+    tool_probe 21/21; 0 faults on both ranks. sparkrun hands the engine both PCIe
+    halves of the port, so it ran two RDMA rails. sq_bench: C1 decode prose/code/
+    JSON 51.2-52.2 / 65.8-66.9 / 61.5-61.7 tok/s (3 repeats each), aggregate C1
+    50.2 / 47.8 and C8 197.1 / 192.4 tok/s (2 repeats each).
+
     NUMERICS POLICY. This profile keeps SparkQwen's tensor-core MoE and mHC
     decode (ATLAS_QWEN4EXP_MOE_TC, _HC_MMA, _MOE_NO_CLAMP, _HC_STAGE_FIT), which
     set a new numerics baseline. Dropping those four and ATLAS_LOOP_STEER keeps
@@ -56,9 +65,17 @@ metadata:
     FABRIC. Each Spark needs an IPv4 address on the cable's netdev. If that netdev
     carries more than one IPv4 address (e.g. a LAN address too), the engine picks
     the RoCE v2 GID on the address the peer reached it at; ATLAS_RDMA_GID overrides.
-    NCCL's bootstrap socket must sit on a netdev whose first IPv4 address the peer
-    can reach (NCCL_SOCKET_IFNAME). One rail is enough: striping over both PCIe
-    halves of the port measured no meaningful gain.
+    NCCL's bootstrap and IB out-of-band sockets bind to the FIRST IPv4 address of
+    NCCL_SOCKET_IFNAME; if the peer cannot reach that address, NCCL init hangs
+    after the unique-ID exchange. If a node's cable netdev lists another address
+    first, fix it in the sparkrun cluster file, not here (cluster env overrides
+    sparkrun's per-host detection):
+      env:
+        NCCL_SOCKET_IFNAME: "=<netdev on node A>,<netdev on node B>"  # exact names; each
+                            # node matches only its own up netdev the peer can reach
+        NCCL_IB_ADDR_RANGE: <cable subnet, e.g. 10.99.2.0/30>   # NCCL's own GID choice
+    One rail is enough: striping over both PCIe halves of the port measured no
+    meaningful gain.
 
     BOTH RANKS MUST LOAD THE SAME cuBLAS (the image's CUDA 13.0). With 13.1 on
     one rank and 13.0 on the other, cached-prefix output stopped matching the
