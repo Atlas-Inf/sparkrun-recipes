@@ -1,0 +1,81 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-Flash-Next-FP4-Local
+runtime: atlas
+# Needs Atlas-Inf/atlas#195 (FP4-Local on its native formats, one GB10; merged 2026-10-21 as
+# 6b09b40aa) and an image built from main at or after it; merge once that image is published.
+# The measurements below are bare-metal on sparky (GB10) from #195's branch; the same file was
+# also served through sparkrun on a local validation image of a78d2fb (answers coherent, needle
+# found; not published).
+container: azeezish/atlas-gb10:latest
+max_nodes: 1
+
+metadata:
+  description: |
+    NVIDIA's quantization-aware Qwen3.8-Flash-Next-FP4-Local (`model_type: qwen4_exp`,
+    snapshot b9ce18a6) on ONE GB10, served in the checkpoint's own number formats:
+      routed experts      NVFP4 with compressed (CSF) scales, decoded losslessly at load
+      attention / GDN     MXFP8 (E4M3 + E8M0), run natively (no dequant, no requant)
+      shared expert       MXFP8, native
+      hc / PLE norms      F32 as shipped
+      vision tower        MXFP8 attention + NVFP4 MLP as shipped, expanded exactly to BF16
+                          for the encoder
+      PLE n-gram table    NVFP4, 28.8 GB, left file-backed on NVMe; hot rows held in a
+                          pinned RAM cache (ATLAS_PLE_CACHE_GB) and decoded on the GPU
+    Any module whose declared format Atlas cannot run natively is widened exactly; an
+    unknown scale encoding refuses to load, naming it.
+
+    PROFILE: single user, 32K context, MTP 3 drafts with the exact lanes — speculative
+    verify and batched rows are bit-identical to serial greedy decode on this checkpoint
+    (CHECKed when the levers were chosen, 2026-10-18). Thinking stays on at
+    reasoning_effort "low".
+
+    MEASURED (sparky, GB10, bare metal, this profile — kernels/gb10/qwen3.8-flash-next/
+    BENCH.toml carries these as the FP4-Local gate entries):
+      MLPerf edge ST-995 (bfcl-subset, no overrides): overall 87.44, normalized 87.32 —
+        run-1792340347555552942 (a78d2fb) and run-1792488042130537521 (5ddfabb6e),
+        identical across the two builds. The NVFP4 vendor pack on the same build and
+        flags: 86.23 / 85.64 (one run each: an observation, not a margin).
+      agentic-webserver, 50 iterations (the 2.5 h shape): 50/50 webserver_ok, 50/50
+        followed_directions, 373 turns, 11.94 s/turn, 4,502 s — run-1792475013132909319
+        (d773b218e).
+      Long context (passcode needle, profile r1 at 262144): found 12/12 from 32K to 245K.
+      Speed (single user, streaming client): ~25 tok/s short chat, ~33 tok/s on a
+        1,500-token code answer. NVIDIA's vLLM recipe on the same box decodes faster
+        (41.5 vs 25.6 tok/s short chat); closing that gap is open work.
+
+    MEMORY: util 0.90 with prefill 8192 is the sizing the vendor pack needed on a
+    unified 128 GB board; FP4-Local fits the same way with the n-gram table off-heap.
+    For longer context raise `max_model_len` at run time; quality past 32K is
+    characterized only by the needle runs above.
+  maintainer: atlas-inf
+  category: general
+  model_params: 180B
+  model_dtype: nvfp4
+  quantization: fp4-local
+  kv_dtype: bf16
+  updated: "2026-10-21"
+
+defaults:
+  port: 8890
+  host: 0.0.0.0
+  kernel_target: qwen3.8-flash-next
+  max_model_len: 32768
+  max_prefill_tokens: 8192
+  kv_cache_dtype: bf16
+  gpu_memory_utilization: 0.90
+  max_num_seqs: 1
+  max_batch_size: 1
+  speculative: true
+  num_drafts: 3
+  enable_prefix_caching: true
+  fast_load_prefetch_shards: true
+  default_chat_template_kwargs: "'{\"reasoning_effort\":\"low\"}'"
+
+env:
+  ATLAS_PLE_CACHE_GB: "2"
+  ATLAS_QWEN4EXP_BATCH_FAST: "1"
+  ATLAS_QWEN4EXP_BATCH_SMALL: "1"
+  ATLAS_QWEN4EXP_DECODE_FUSE: "1"
+  ATLAS_QWEN4EXP_EXACT_VERIFY: "1"
+  ATLAS_QWEN4EXP_HC_FAST: "1"
+  ATLAS_QWEN4EXP_MTP_DEPTH: "3"
