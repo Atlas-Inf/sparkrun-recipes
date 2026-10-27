@@ -6,7 +6,7 @@ runtime: atlas
 # The measurements below are bare-metal on sparky (GB10) from #195's branch; the same file was
 # also served through sparkrun on a local validation image of a78d2fb (answers coherent, needle
 # found; not published).
-container: azeezish/atlas-gb10:latest
+container: ghcr.io/atlas-inf/atlas-gb10:sha-da7985c
 max_nodes: 1
 
 metadata:
@@ -79,3 +79,11 @@ env:
   ATLAS_QWEN4EXP_EXACT_VERIFY: "1"
   ATLAS_QWEN4EXP_HC_FAST: "1"
   ATLAS_QWEN4EXP_MTP_DEPTH: "3"
+  # Fork checkpoint for shared prompt prefixes (system prompt + tools): every new
+  # conversation after the first restores at the fork instead of recomputing it.
+  # PC_BRANCH needs MIDCHUNK_CKPT (the in-pass checkpoint it plans). Gated on sparky
+  # (GB10) 2026-10-23: BFCL ST-995 87.64 / 87.38, agentic-webserver 50/50 + 50/50,
+  # agentic TTFT p90 3.1 s -> 2.2 s. ATLAS_QWEN4EXP_PREFILL_ROWINV is deliberately
+  # NOT set: with it, BFCL normalized drops to 86.50 (below the 86.92 floor).
+  ATLAS_QWEN4EXP_PREFILL_MIDCHUNK_CKPT: "1"
+  ATLAS_QWEN4EXP_PC_BRANCH: "1"
