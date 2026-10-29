@@ -6,7 +6,7 @@ runtime: atlas
 # The measurements below are bare-metal on sparky (GB10) from #195's branch; the same file was
 # also served through sparkrun on a local validation image of a78d2fb (answers coherent, needle
 # found; not published).
-container: ghcr.io/atlas-inf/atlas-gb10:sha-da7985c
+container: ghcr.io/atlas-inf/atlas-gb10:sha-87df79b
 max_nodes: 1
 
 metadata:
