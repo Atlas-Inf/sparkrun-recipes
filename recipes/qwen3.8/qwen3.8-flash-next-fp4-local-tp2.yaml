@@ -1,0 +1,230 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-Flash-Next-FP4-Local
+runtime: atlas
+# Needs Atlas-Inf/atlas#195 (FP4-Local on one GB10) and #198 (FP4-Local TP=EP=2, stacked on #195) on main and
+# an image built after them; merge this recipe after those. Until then the measurements below come from
+# #198's head 864c81fb3 (spark binary sha256 54e4f132...): natively on the pair, and through sparkrun with
+# this file on a local validation image (atlas-gb10:pr198-864c81fb3 = azeezish/atlas-gb10:b9a7eda runtime +
+# that binary; not published).
+container: azeezish/atlas-gb10:latest
+min_nodes: 2
+max_nodes: 2
+
+metadata:
+  description: |
+    NVIDIA's quantization-aware Qwen3.8-Flash-Next-FP4-Local (`model_type: qwen4_exp`,
+    snapshot b9ce18a6) on TWO GB10s, tensor and expert parallel (TP=EP=2), served in
+    the checkpoint's own number formats:
+      routed experts      NVFP4 with compressed (CSF) scales, decoded losslessly at load
+      attention / GDN     MXFP8 (E4M3 + E8M0), sliced per rank on the shipped bytes:
+                          q/k/v and GDN segments by rows, o/out_proj by columns on
+                          whole 32-input scale groups (no dequant, no requant)
+      shared expert       MXFP8, replicated, added once after the EP all-reduce
+      router (mlp.gate)   BF16 as shipped (not requantized)
+      hc / PLE norms      F32 as shipped
+      PLE n-gram table    NVFP4, all 28.8 GB RESIDENT on each rank, decoded on the GPU:
+                          nothing is read from NVMe while serving (boot self-check
+                          against the files; ~10-25 s load)
+    The rest is SparkQwen's RC16 8x32k profile (Enntity) as run by the NVFP4 TP2 recipe,
+    plus ATLAS_PLE_RESIDENT=1.
+
+    EXACT: speculative (MTP, up to 7 drafts) greedy output equals serial greedy output
+    at 1 and 8 concurrent requests; behind a shared ~4.4K-token prefix (4,448 / 4,480
+    cached tokens) cached speculative output at 1 and 4 requests equals serial uncached
+    output; decode/verify rows of every MXFP8 projection are the single-row kernel's
+    bytes at any batch (prefill uses its own, chunk-invariant numerics).
+
+    MEASURED 2026-10-21, natively on one pair (reiner + spark2, one CX7 cable), #198
+    head 864c81fb3, this profile, util 0.88:
+      Gates: speculative == serial 8/8 at C1 and C8; cached prefix (C1, C4) == serial
+        uncached 8/8; cross-contamination 8/8 (1,696 tokens); tool probe 21/21.
+        Needles at 9K / 35K / 66K / 128K / 240K tokens found (4x262k variant); 77K
+        needle 23.9 s to first token, 56.0 tok/s; four concurrent 100K prompts answered.
+      MLPerf edge ST-995 (bfcl-subset, no overrides): overall 87.04, normalized 85.75
+        (run-1792557711972352834; floors 83.64 / 85.32). Earlier #198 builds: 87.44 /
+        87.45 and 87.64 / 87.71. One GB10 (#195): 87.44 / 87.32.
+      MLPerf edge agentic 2.5 h leg (C=1, temperature 0): 1,007 / 1,007 turns, 0 failed,
+        4,027 s; TTFT p50 / p90 / p99 364 / 609 / 1,179 ms; TPOT 24.2 / 26.4 / 28.2 ms;
+        inline score 0.587 (the NVFP4 TP2 recipe measured 0.5125 in 2,247 s).
+      sparkDash decode (thinking off, 400 forced tokens, aggregate tok/s at 1 / 2 / 4 / 8
+        requests, mean of 3): prose 71.2 / 107.5 / 148.4 / 266.4, code 92.3 / 137.1 /
+        208.6 / 275.2, structured 101.6 / 161.4 / 354 / 397.3, json 78.0 / 130.6 /
+        187.7 / 314.4. Without speculation: 36-37 tok/s at 1 request.
+        Same binary on the NVFP4 pack: prose 72.0 / 116.9 / 160.7 / 283.9.
+        Published, other GB10 pairs (observations, not A/Bs): TensorFold dual v1.0 NVFP4
+        prose 67.4 / 98.9 / 152.2 / 231.2; vLLM v0.30 TP2+EP MTP3 NVFP4 prose 61.0 /
+        95.9 / 148.2 / 238-241.
+      Streaming client: short chat 63.1 tok/s (0.17 s to first token); ~18K-token agent
+        turn 43.3 tok/s, 5.8 s cold first token; cold TTFT median (1K/4K/16K) 1.51 s;
+        aggregate at 1 / 2 / 4 / 5 / 8 users (512 / 2,048-token prompts) 65 / 108 / 130 /
+        161 / 206 tok/s. One GB10 (#195): short 25.6 tok/s, agent 22.9 tok/s, 15.4 s.
+
+    SPARKRUN (2026-10-21, same pair): launched with this file through `sparkrun run ...
+    --cluster <pair> --image atlas-gb10:pr198-864c81fb3` (validation image: the
+    b9a7eda runtime with the 864c81fb3 binary; cuBLAS 13.0.0.19 in the image vs
+    13.0.2.14 natively), `model:` pointed at the on-disk snapshot so sparkrun does not
+    copy weights:
+      Speculative greedy at C1 and C8 and cached at C4: 8/8 identical to the native
+      serial references; behind the ~4.4K-token prefix (4,448 / 4,480 cached tokens)
+      the same hashes as natively; cross-contamination 8/8; tool probe 21/21.
+      decode-floor 83.5 / 83.5 / 83.6 tok/s (acceptance 4.27); sparkDash prose 71.1 /
+      107.5 / 149.8 / 266.7, code 92.5 / 137.1 / 209.6 / 277.0, json 78.2 / 130.8 /
+      188.3 / 320.2 (one run; within 2% of the native means above).
+    Weights: put the snapshot on both nodes first and point `model:` at it (or let
+    sparkrun's model distribution fetch it). Do not let sparkrun distribute a model
+    from the head node to itself when that node's HF cache keeps blobs as symlinks
+    into another store: on our head node the copy removed the cache's blob symlinks
+    (the data in the store survived; the links were recreated).
+
+    MEMORY. Each rank holds ~85 GB before the KV pool (weights + the 28.8 GB table); at
+    util 0.88 that leaves ~1.27M KV tokens per rank. The pool is sized after the table
+    is allocated, from the driver-tracked footprint; requests larger than the pool are
+    refused. At util 0.70 the replicated table does not fit: drop ATLAS_PLE_RESIDENT
+    (NVMe-backed table with a RAM row cache, bit-identical output) or wait for the
+    head-sharded table.
+
+    ROLLBACK SWITCHES. ATLAS_PLE_RESIDENT unset: the NVMe-backed table, same output.
+    ATLAS_QWEN4EXP_ROUTER_NVFP4=1: route on a load-time NVFP4 copy of the router (the
+    old path; lossy; measured exact speculative == serial and slightly higher
+    single-stream speed on some prompt types, 84.6 vs 83.6 decode-floor).
+
+    FABRIC, cuBLAS, KV: as in the NVFP4 TP2 recipe (one rail is enough; NCCL binds the
+    first IPv4 of NCCL_SOCKET_IFNAME; both ranks must load the same cuBLAS; BF16 KV).
+    If the HF cache on a node uses symlinks into another directory, mount that
+    directory in the sparkrun cluster file too (read-only).
+  maintainer: atlas-inf
+  category: general
+  model_params: 180B
+  model_dtype: nvfp4
+  quantization: NVFP4 experts + MXFP8 attention/GDN/shared expert (modelopt MIXED_PRECISION, FP4-Local QAD)
+  kv_dtype: bf16
+
+defaults:
+  port: 8889
+  host: 0.0.0.0
+  kernel_target: qwen3.8-flash-next
+  tensor_parallel: 2
+  ep_size: 2
+  max_model_len: 32768
+  max_prefill_tokens: 16384
+  kv_cache_dtype: bf16
+  gpu_memory_utilization: 0.88
+  oom_guard_mb: 4096
+  max_num_seqs: 8
+  max_batch_size: 8
+  speculative: true
+  num_drafts: 7
+  enable_prefix_caching: true
+  fast_load_prefetch_shards: true
+  default_chat_template_kwargs: "'{\"reasoning_effort\":\"low\"}'"
+
+env:
+  # FP4-Local: the whole NVFP4 n-gram table resident on both ranks (startup parity checks it).
+  ATLAS_PLE_RESIDENT: "1"
+  ATLAS_EP_PROTOCOL: "v2"
+  ATLAS_RDMA_ALLREDUCE: "1"
+  ATLAS_RDMA_ONESHOT: "1"
+  ATLAS_RDMA_PAIR_CHAIN: "1"
+  ATLAS_GLM_CMD_RDMA: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH_COLLECTIVES: "1"
+  ATLAS_QWEN4EXP_HC_FAST: "1"
+  ATLAS_QWEN4EXP_LMHEAD_SPLIT: "1"
+  ATLAS_QWEN4EXP_LMHEAD_BATCHM: "1"
+  ATLAS_QWEN4EXP_EXACT_VERIFY: "1"
+  ATLAS_QWEN4EXP_MOE_FAST: "1"
+  ATLAS_QWEN4EXP_DECODE_FUSE: "1"
+  ATLAS_QWEN4EXP_BATCH_FAST: "1"
+  ATLAS_QWEN4EXP_MTP_DEPTH: "7"
+  ATLAS_MTP_SINGLE_DEPTH_ADAPT: "1"
+  ATLAS_QWEN4EXP_DRAFT_HEAD_NVFP4: "1"
+  ATLAS_QWEN4EXP_PREFILL_MOE: "1"
+  ATLAS_QWEN4EXP_PREFILL_GDN: "1"
+  ATLAS_QWEN4EXP_PREFILL_QSA_SCORE: "1"
+  ATLAS_QWEN4EXP_PREFILL_HC: "1"
+  ATLAS_QWEN4EXP_DECODE_GRAPH_WIDE: "1"
+  ATLAS_QWEN4EXP_BATCH_SMALL: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP: "1"
+  ATLAS_QWEN4EXP_PREFILL_MOE_W2: "1"
+  ATLAS_LT_KCHAIN_PIN: "1"
+  ATLAS_QWEN4EXP_PREFILL_BA_ROWS: "1"
+  ATLAS_QWEN4EXP_PREFILL_FP8_W2: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_SHARED: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_PIPE: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_RS_PIPE: "1"
+  ATLAS_QWEN4EXP_PREFILL_QSA_SPLIT: "1"
+  ATLAS_QWEN4EXP_PREFILL_SP_ROUTE: "1"
+  ATLAS_QWEN4EXP_PREFILL_MIDCHUNK_CKPT: "1"
+  ATLAS_QWEN4EXP_CKPT_AUX_SHARE: "1"
+  ATLAS_QWEN4EXP_AUX_PINNED: "1"
+  ATLAS_QWEN4EXP_PREFILL_HOST_IDS: "1"
+  ATLAS_QWEN4EXP_QSA_REUSE: "1"
+  ATLAS_QWEN4EXP_SP_PREALLOC: "1"
+  ATLAS_PLE_WARM_BG: "1"
+  ATLAS_MTP_MAX_SEQS: "8"
+  ATLAS_MTP_GATE_FORCE: "1"
+  ATLAS_MTP_DYNAMIC_DEPTH: "1"
+  ATLAS_MTP_DEEP_MAX_SEQS: "2"
+  ATLAS_QWEN4EXP_MTP_KV_KEEP: "1"
+  ATLAS_NO_MTP_DCUT: "1"
+  ATLAS_QWEN4EXP_MTP_DRAFT_TP: "1"
+  ATLAS_PLE_NVME_KEEPALIVE_MS: "10"
+  ATLAS_PLE_FAULT_POOL: "1"
+  ATLAS_VERIFY_PICK_PAR: "1"
+  ATLAS_QWEN4EXP_HC_WIDE: "1"
+  ATLAS_QWEN4EXP_MTP_GROUPED_NORM: "1"
+  ATLAS_GLM_ZERO_ROWS: "1"
+  ATLAS_QWEN4EXP_EOS_BAN: "1"
+  ATLAS_QWEN4EXP_QKV_ROWS_2D: "1"
+  ATLAS_QWEN4EXP_VERIFY_BT_PINNED: "1"
+  ATLAS_QWEN4EXP_EXACT_DEFER: "1"
+  ATLAS_QWEN4EXP_QSA_KEY_ONLY: "1"
+  ATLAS_QWEN4EXP_QSA_COMMIT_ROWS: "1"
+  ATLAS_CONTENT_LOOP_WATCHDOG: "1"
+  ATLAS_CONTENT_LOOP_MIN_REPEATS: "32"
+  ATLAS_LOOP_STEER: "1"
+  ATLAS_QWEN4EXP_FINISH_LEAF: "1"
+  ATLAS_QWEN4EXP_QSA_TOPK_WIDE: "1"
+  ATLAS_QWEN4EXP_QSA_DECODE_ROWS: "1"
+  ATLAS_QWEN4EXP_MOE_TC: "1"
+  ATLAS_QWEN4EXP_MOE_NO_CLAMP: "1"
+  ATLAS_QWEN4EXP_HC_STAGE_FIT: "1"
+  ATLAS_QWEN4EXP_HC_MMA: "1"
+  ATLAS_QWEN4EXP_QSA_SPARE_MAX: "288"
+  ATLAS_QWEN4EXP_PREFILL_ROWINV: "1"
+  ATLAS_QWEN4EXP_GDN_COMMIT_FUSE: "1"
+  ATLAS_QWEN4EXP_QSA_COMMIT_TABLE: "1"
+  ATLAS_QWEN4EXP_KV_LOOKAHEAD: "64"
+  ATLAS_QWEN4EXP_PREFILL_MULTI: "1"
+  ATLAS_PREFILL_CODISPATCH: "1"
+  ATLAS_PREFILL_CODISPATCH_WINDOW_MS: "20"
+  ATLAS_PREFILL_CODISPATCH_SETTLE_MS: "3"
+  ATLAS_QWEN4EXP_PREFILL_MOE_NODUP: "1"
+  ATLAS_QWEN4EXP_LMHEAD_SPLIT_VERIFY: "1"
+  ATLAS_RDMA_ONESHOT_MAX: "8388608"
+  ATLAS_MTP_DFLASH_CTX_SCOPED: "1"
+  ATLAS_QWEN4EXP_ROWS32_TILE: "1"
+  ATLAS_QWEN4EXP_PREFILL_MULTI_CACHED: "1"
+  ATLAS_QWEN4EXP_W4_ROWS: "1"
+  ATLAS_QWEN4EXP_W4_ROWS_WIDE: "1"
+  ATLAS_QWEN4EXP_PREFILL_GEMM_RASTER: "1"
+  NCCL_ALGO: "Ring"
+  NCCL_BUFFSIZE: "33554432"
+  NCCL_CROSS_NIC: "0"
+  NCCL_CUMEM_ENABLE: "0"
+  NCCL_CUMEM_HOST_ENABLE: "0"
+  NCCL_DEBUG: "WARN"
+  NCCL_DMABUF_ENABLE: "0"
+  NCCL_IB_ADDR_FAMILY: "AF_INET"
+  NCCL_IB_DISABLE: "0"
+  NCCL_IB_RETRY_CNT: "7"
+  NCCL_IB_ROCE_VERSION_NUM: "2"
+  NCCL_IB_TIMEOUT: "22"
+  NCCL_MAX_NCHANNELS: "2"
+  NCCL_MIN_NCHANNELS: "1"
+  NCCL_NET: "IB"
+  NCCL_NET_GDR_C2C: "0"
+  NCCL_NET_GDR_LEVEL: "0"
+  NCCL_NVLS_ENABLE: "0"
+  NCCL_PROTO: "Simple"
+  RUST_LOG: "info"
