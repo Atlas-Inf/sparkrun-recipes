@@ -90,4 +90,7 @@ defaults:
   # §A and QWEN38_PORT_GAP_ANALYSIS §I.5. The BFCL draw itself is unchanged
   # (62/10/10, n=995, seed 42, temp 0, no param overrides).
   disable_thinking: false
-  default_chat_template_kwargs: '{"reasoning_effort":"medium"}'
+  # Shell-quoted like the other recipes' kwargs: sparkrun renders this value
+  # into a shell command line, so bare JSON loses its double quotes and the
+  # server aborts at startup ("--default-chat-template-kwargs is not valid JSON").
+  default_chat_template_kwargs: "'{\"reasoning_effort\":\"medium\"}'"
