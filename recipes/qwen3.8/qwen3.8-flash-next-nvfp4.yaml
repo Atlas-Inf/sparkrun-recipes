@@ -299,8 +299,11 @@ defaults:
   kernel_target: qwen3.8-flash-next
   # Long prompts still work at 32768 — they prefill in 8K chunks. The prefill
   # arena is what OOMs at 32K (~13 GB), not the context window; see the
-  # NVIDIA PACK SIZING paragraph in the description.
-  max_seq_len: 32768
+  # NVIDIA PACK SIZING paragraph in the description. Must be max_model_len:
+  # sparkrun's atlas runtime maps that to --max-seq-len and silently drops
+  # unknown keys (the engine default is also 32768, so this only removes the
+  # dropped-key warning and keeps intent explicit).
+  max_model_len: 32768
   max_prefill_tokens: 8192
   # bf16, not fp8 — this checkpoint ships no k/v scales. See the description.
   kv_cache_dtype: bf16
