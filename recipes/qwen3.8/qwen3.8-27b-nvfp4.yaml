@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
-container: ghcr.io/atlas-inf/atlas-gb10:latest
+container: ghcr.io/atlas-inf/atlas-gb10:sha-457df04
 max_nodes: 1
 
 metadata:
@@ -30,7 +30,7 @@ metadata:
   model_dtype: nvfp4
   quantization: nvfp4
   kv_dtype: fp8
-  updated: "2026-09-03"
+  updated: "2026-11-03"
 
 defaults:
   host: 0.0.0.0
