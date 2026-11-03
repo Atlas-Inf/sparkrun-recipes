@@ -6,7 +6,7 @@ runtime: atlas
 # The measurements below are bare-metal on sparky (GB10) from #195's branch; the same file was
 # also served through sparkrun on a local validation image of a78d2fb (answers coherent, needle
 # found; not published).
-container: ghcr.io/atlas-inf/atlas-gb10:sha-87df79b
+container: ghcr.io/atlas-inf/atlas-gb10:sha-457df04
 max_nodes: 1
 
 metadata:
@@ -53,7 +53,7 @@ metadata:
   model_dtype: nvfp4
   quantization: fp4-local
   kv_dtype: bf16
-  updated: "2026-10-21"
+  updated: "2026-11-03"
 
 defaults:
   port: 8890
