@@ -23,8 +23,8 @@ metadata:
       NCCL_IB_ADDR_RANGE: <cable subnet, e.g. 10.99.2.0/30>
 
     MEASURED 2026-11-02 with this file through `sparkrun run ... --cluster <pair>` on one pair
-(reiner + spark2, one CX7 cable), image sha-9c45191: up in 154 s. Greedy C8 == C1 8/8;
-tool_probe 3/3 in every category.
+    (reiner + spark2, one CX7 cable), image sha-9c45191: up in 154 s. Greedy C8 == C1 8/8;
+    tool_probe 3/3 in every category.
   maintainer: atlas-inf
   category: general
   model_params: 180B

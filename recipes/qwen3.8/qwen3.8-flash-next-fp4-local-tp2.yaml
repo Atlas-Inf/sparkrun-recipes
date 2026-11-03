@@ -26,13 +26,13 @@ metadata:
       NCCL_IB_ADDR_RANGE: <cable subnet, e.g. 10.99.2.0/30>
 
     MEASURED 2026-11-02 with this file through `sparkrun run ... --cluster <pair>` on one pair
-(reiner + spark2, one CX7 cable), image sha-9c45191: up in 195 s. Logit drift vs the
-same engine served natively: KL 0 over 34,245 positions (teacher-forced top-20 on 6 text
-cases + 4 generated chat cases). Greedy at C1 identical 8/8 to native main (= SparkQwen
-0.4.0's); C8 == C1 8/8. tool_probe 3/3 in every category. sq_bench (thinking at the
-template default): decode prose / code / JSON 60.6-61.2 / 92.1-92.5 / 70.8-71.2 tok/s;
-aggregate C1 / C2 / C4 57.9-60.6 / 90.1-93.6 / 140.1-142.8 tok/s; cold TTFT 2K / 8K
-0.66 / 1.91 s.
+    (reiner + spark2, one CX7 cable), image sha-9c45191: up in 195 s. Logit drift vs the
+    same engine served natively: KL 0 over 34,245 positions (teacher-forced top-20 on 6 text
+    cases + 4 generated chat cases). Greedy at C1 identical 8/8 to native main (= SparkQwen
+    0.4.0's); C8 == C1 8/8. tool_probe 3/3 in every category. sq_bench (thinking at the
+    template default): decode prose / code / JSON 60.6-61.2 / 92.1-92.5 / 70.8-71.2 tok/s;
+    aggregate C1 / C2 / C4 57.9-60.6 / 90.1-93.6 / 140.1-142.8 tok/s; cold TTFT 2K / 8K
+    0.66 / 1.91 s.
   maintainer: atlas-inf
   category: general
   model_params: 180B
