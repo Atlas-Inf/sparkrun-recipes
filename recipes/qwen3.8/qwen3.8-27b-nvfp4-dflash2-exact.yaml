@@ -1,0 +1,74 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-27B-NVFP4
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:sha-1f6de55
+max_nodes: 1
+metadata:
+  description: |
+    Qwen3.8-27B (nvidia NVFP4) with EXACT DFlash2 speculative decoding on one GB10,
+    the atlas#333 serving profile: output byte-identical to serial decode at every
+    concurrency, inside <think> too, up to 64 concurrent requests at the full 262K
+    context. Sibling of qwen3.8-27b-nvfp4-dflash2 (single-stream, pre-#333 levers).
+    The levers are environment variables (atlas#333 "SparkQwen 27B profile"), set by
+    the recipe's env: block:
+      ATLAS_EXACT_VERIFY / ATLAS_SKINNY_MMA     exact (row-invariant) verify and batching
+      ATLAS_QWEN38_DECODE_FUSE / _VERIFY_FUSE   one-launch GDN decode and verify
+      ATLAS_QWEN38_VERIFY_DEFER                 commit after the verdict (verify pools 11-22 GB -> 0.14 GB)
+      ATLAS_QWEN38_PDL / ATLAS_GDN_CHUNK_TC     PDL decode chain, tensor-core GDN chunk prefill
+      ATLAS_DENSE_PREFILL_BF16MMA / _LOWP=1     atlas#331 dense prefill on BF16 tensor cores,
+                                                W4A8 groups (new numerics; gated below)
+      ATLAS_DECODE_TIME_SHARE=0.3               decode keeps a share beside long prefills
+      ATLAS_MTP_GATE_FORCE=1
+    MEASURED (sparky GB10, 2026-11-10, PR head 29f3b59e75 built natively; same env/flags;
+    stock nvidia checkpoint, no NVFP4 GDN overlay):
+      exactness   SparkQwen greedy_eq, 8 prompts x 320 tok, thinking low: DFlash2 == serial
+                  decode 8/8 at C1, C8 and 64-way (8 x C8), and at C1/C8 behind a shared
+                  4.4K cached prefix; Atlas cross-contamination 8/8
+      gates       bfcl-subset 87.94 / 87.16 (floors 83.82 / 83.72); agentic-webserver
+                  10/10 / 10/10, sum wall 619 s; ssm-state-poisoning collapsed 0
+      speed       decode-floor median 55.4 tok/s (accept 5.29); sq_bench C1 decode prose /
+                  code / json 27.8 / 45.6 / 43.6 (thinking on); aggregate C1/2/4/8
+                  ~29 / 51 / 72 / 90; cold TTFT 2K/8K/16K/28K 1.32 / 4.90 / 10.7 / 21.3 s;
+                  warm TTFT 8K / 20K 0.32 / 0.38 s
+    RECIPE VET (this file through sparkrun 0.3.10 on sha-1f6de55, sparky, 2026-11-10):
+      all 11 env levers present in the serving process; greedy_eq == serial 8/8 at C1/C8
+      plain and prefix; decode-floor 55.3 (run-1794296147033692879); agentic-webserver
+      10/10 / 10/10, sum wall 580 s (run-1794296728677330092); bfcl-subset 87.94 / 87.16
+      (run-1794304186066971751); 0 serve ERROR/panic lines.
+    KV at 262K x 64 is overcommitted by design (paged KV allocates on demand; one
+    sequence fits at full length): long-context bursts back-pressure at the allocator.
+    Keep speculation ON with this profile: plain decode at 64 sequences sizes an SSM
+    decode-rollback ring of ~81 GB and is killed at load (reported on atlas#333).
+    --speculative is not passed: --dflash is the speculative method and the two conflict.
+  maintainer: Atlas
+  category: agent
+  model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
+  model_dtype: nvfp4
+  quantization: "NVFP4 (mixed precision — FP8 linear_attn/self_attn, NVFP4 MLP)"
+  kv_dtype: bf16
+  updated: "2026-11-10"
+
+env:
+  ATLAS_EXACT_VERIFY: "1"
+  ATLAS_SKINNY_MMA: "1"
+  ATLAS_QWEN38_PDL: "1"
+  ATLAS_QWEN38_DECODE_FUSE: "1"
+  ATLAS_QWEN38_VERIFY_FUSE: "1"
+  ATLAS_QWEN38_VERIFY_DEFER: "1"
+  ATLAS_GDN_CHUNK_TC: "1"
+  ATLAS_DENSE_PREFILL_BF16MMA: "1"
+  ATLAS_DENSE_PREFILL_LOWP: "1"
+  ATLAS_DECODE_TIME_SHARE: "0.3"
+  ATLAS_MTP_GATE_FORCE: "1"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 262144
+  max_num_seqs: 64
+  max_batch_size: 64
+  kv_cache_dtype: bf16
+  enable_prefix_caching: true
+  dflash: true
+  draft_model: incoai/Qwen3.8-27B-DFlash2
+  dflash_gamma: 8
