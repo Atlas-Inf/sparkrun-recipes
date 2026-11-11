@@ -1,0 +1,53 @@
+recipe_version: "2"
+model: ricursiveAI/Ripple-65B-Preview-NVFP4
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:sha-ed8c57e
+max_nodes: 1
+metadata:
+  description: |
+    Ricursive Ripple-65B Preview (NVFP4 ModelOpt, 80 dense layers, 4 SWA : 1 global NoPE,
+    value residuals) with its DFlash2 drafter (gamma 32), Strict numerics, ONE GB10, single
+    stream: atlas#328 (landed via #334) with the #341 lookup gate. Serve = the PR's
+    benchmarked command; levers are set through the env: block.
+      ATLAS_RICURSIVE_PDL=1            PDL on the DFlash verify chain
+      ATLAS_DFLASH_DRAFTER_FP8_M32=1   drafter on FP8 GEMV mirrors (changes acceptance, never output)
+      ATLAS_BF16_GEMM_CUTLASS=1        tuned CUTLASS BF16 tiles at M >= 256 (bit-identical)
+    CUTLASS: the published gb10 image is built WITHOUT CUTLASS_HOME, so the prefill FFN's
+    SM120 NVFP4 CUTLASS path and the CUTLASS BF16 tiles fall back (one warning). Prefill is
+    therefore below the PR's 892-907 tok/s figure on this image; decode is unaffected.
+    RECIPE VET (this file through sparkrun 0.3.10 on sha-ed8c57e, sparky GB10, 2026-11-11):
+      env levers 3/3 in the serving process; "DFlash drafter: 37 FP8 GEMV mirrors"; the image's
+      expected "W4A4 rows: no CUTLASS prefill GEMM ... prefill uses the tile GEMM" warning; 0 ERROR
+      lines. DFlash2 decode (512 tok, ignore_eos, n=3 medians): code 29.4 / prose 8.7 / long 15.9 tok/s
+      (native CUTLASS build: 28.5 / 8.1 / 15.1). Prefill TTFT (sq_bench, unique prompts): 1,350 tok
+      2.78 s, 5,346 tok 12.8 s, 10,692 tok 26.9 s, 18,740 tok 49.4 s, ~380-490 tok/s (native CUTLASS
+      build: ~820-910 tok/s). Greedy text follows the tile-GEMM prefill numerics, so it parts from a
+      CUTLASS build's within the first tokens on these prompts (both are Strict W4A4, different
+      accumulation order).
+    Validated at max_num_seqs 1 only (as in the PR). Don't set ATLAS_CUBLAS_GEMM=1 (PR caveat).
+  maintainer: Atlas
+  category: chat
+  model_params: 65B dense
+  model_dtype: nvfp4
+  quantization: "NVFP4 (ModelOpt; W4A4 at the checkpoint's static input_scale on multi-row FFN)"
+  kv_dtype: bf16
+  updated: "2026-11-11"
+
+env:
+  ATLAS_RICURSIVE_PDL: "1"
+  ATLAS_DFLASH_DRAFTER_FP8_M32: "1"
+  ATLAS_BF16_GEMM_CUTLASS: "1"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  kernel_target: ricursive-ripple-65b
+  max_model_len: 32768
+  max_num_seqs: 1
+  max_batch_size: 1
+  kv_cache_dtype: bf16
+  gpu_memory_utilization: 0.88
+  dflash: true
+  draft_model: ricursiveAI/Ripple-65B-Preview-DFlash2
+  dflash_window_size: 16384
+  request_timeout: 600
