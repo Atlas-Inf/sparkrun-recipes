@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
-container: ghcr.io/atlas-inf/atlas-gb10:sha-1f6de55
+container: ghcr.io/atlas-inf/atlas-gb10:sha-ed8c57e
 max_nodes: 1
 metadata:
   description: |
@@ -35,6 +35,13 @@ metadata:
       plain and prefix; decode-floor 55.3 (run-1794296147033692879); agentic-webserver
       10/10 / 10/10, sum wall 580 s (run-1794296728677330092); bfcl-subset 87.94 / 87.16
       (run-1794304186066971751); 0 serve ERROR/panic lines.
+    RE-PIN 2026-11-10 to sha-ed8c57e (adds atlas#337: a request joining two DFlash decoders no
+      longer loses its drafter — joining TTFT 32.9 -> 0.84 s, 4.8 -> 26.6 tok/s; #341 kernel-lookup
+      gate; #340 fail-fast SSM pool sizing; #335 opt-in ATLAS_ATTN_SHARED_SCAN, ~2.2x decode at
+      187K context, exact; left OFF here pending tree-verify / sampled coverage). Vet on this image:
+      greedy_eq == serial 8/8 at C1/C8 plain and prefix; decode-floor 55.4
+      (run-1794346459777438710); agentic-webserver 10/10 / 10/10, sum wall 581 s
+      (run-1794347043439634099); 0 serve ERROR/panic/unresolved-lookup lines.
     KV at 262K x 64 is overcommitted by design (paged KV allocates on demand; one
     sequence fits at full length): long-context bursts back-pressure at the allocator.
     Keep speculation ON with this profile: plain decode at 64 sequences sizes an SSM
