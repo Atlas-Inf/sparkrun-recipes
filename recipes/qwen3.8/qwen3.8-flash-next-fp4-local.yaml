@@ -72,6 +72,15 @@ defaults:
   default_chat_template_kwargs: "'{\"reasoning_effort\":\"low\"}'"
 
 env:
+  # The checkpoint's own formats (atlas#349 warns when these are unset): MXFP8 GDN/QSA decode and
+  # shared expert, W8A8 prefill, W4A4 routed prefill at the checkpoint's input scales. Unset = BF16
+  # expansions. Gated on sparky (GB10, sha-32fa2a3) 2026-11-12, one variable vs this recipe without them:
+  # agentic-webserver 50/50 + 50/50 at 9.9 s/turn, sum wall 3341 s (without: 50/50, 10.7 s/turn,
+  # 4146 s); BFCL ST-995 87.54 / 87.50 (without: 87.64 / 88.05; floors 87.04 / 86.92).
+  ATLAS_QWEN4EXP_MXFP8_DECODE: "1"
+  ATLAS_QWEN4EXP_PREFILL_W8A8: "1"
+  ATLAS_QWEN4EXP_MXFP8_SHARED: "1"
+  ATLAS_QWEN4EXP_PREFILL_W4A4: "1"
   ATLAS_PLE_CACHE_GB: "2"
   ATLAS_QWEN4EXP_BATCH_FAST: "1"
   ATLAS_QWEN4EXP_BATCH_SMALL: "1"
