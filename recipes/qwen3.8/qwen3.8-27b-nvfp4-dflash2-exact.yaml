@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: nvidia/Qwen3.8-27B-NVFP4
 runtime: atlas
-container: ghcr.io/atlas-inf/atlas-gb10:sha-ed8c57e
+container: ghcr.io/atlas-inf/atlas-gb10:sha-2e4e208
 max_nodes: 1
 metadata:
   description: |
@@ -42,6 +42,17 @@ metadata:
       greedy_eq == serial 8/8 at C1/C8 plain and prefix; decode-floor 55.4
       (run-1794346459777438710); agentic-webserver 10/10 / 10/10, sum wall 581 s
       (run-1794347043439634099); 0 serve ERROR/panic/unresolved-lookup lines.
+    2026-11-14, sha-2e4e208: ATLAS_ATTN_SHARED_SCAN=1 (atlas#335, shared-scan BF16 paged decode) is ON.
+      One-variable A/B through sparkrun (switch off = job 132, on = job 133): greedy_eq == the
+      switch-on serial decode 8/8 at C1/C8 plain and prefix; decode-floor 55.3 -> 58.0;
+      agentic-webserver 10/10 both (6.68 -> 6.42 s/turn); bfcl-subset 87.94 / 87.16 -> 88.74 / 88.96
+      (run-1794621979979477621); 187K-token warm decode 16.5 -> 35.7 tok/s; sampled (temp 0.7, 24
+      replies) distinct-4gram 0.990 off / 0.993 on, same finish mix. Greedy text differs from the
+      switch-off build at near-ties (sums reordered); each build is exact against its own serial.
+      Tree verify (ATLAS_DFLASH_TREE) stays OFF: it 500s on main (fixed in atlas#368) and, fixed,
+      accepts no drafts here yet; at 64 seqs it does not fit.
+    request_timeout 1800: a cold 187K prompt prefills in ~345 s and a 260K one in ~617 s, past the
+      server's 300 s default deadline (which cut such requests with finish_reason "timeout").
     KV at 262K x 64 is overcommitted by design (paged KV allocates on demand; one
     sequence fits at full length): long-context bursts back-pressure at the allocator.
     Keep speculation ON with this profile: plain decode at 64 sequences sizes an SSM
@@ -53,7 +64,7 @@ metadata:
   model_dtype: nvfp4
   quantization: "NVFP4 (mixed precision — FP8 linear_attn/self_attn, NVFP4 MLP)"
   kv_dtype: bf16
-  updated: "2026-11-10"
+  updated: "2026-11-14"
 
 env:
   ATLAS_EXACT_VERIFY: "1"
@@ -67,6 +78,7 @@ env:
   ATLAS_DENSE_PREFILL_LOWP: "1"
   ATLAS_DECODE_TIME_SHARE: "0.3"
   ATLAS_MTP_GATE_FORCE: "1"
+  ATLAS_ATTN_SHARED_SCAN: "1"
 
 defaults:
   host: 0.0.0.0
@@ -79,3 +91,4 @@ defaults:
   dflash: true
   draft_model: incoai/Qwen3.8-27B-DFlash2
   dflash_gamma: 8
+  request_timeout: 1800
