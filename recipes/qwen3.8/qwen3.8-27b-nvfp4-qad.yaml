@@ -16,9 +16,20 @@ metadata:
     every layer as stored beats re-rounding attention to NVFP4. This recipe follows
     that finding. It does not use SparkQwen's TandemLLM NVFP4 overlay.
     License: the weights are under the NVIDIA Open Model Agreement; check it before use.
-    NO MTP HEAD: the checkpoint ships no mtp.* weights. --speculative (MTP) loads
-    nothing and serves serially, so the MTP recipes lose all speculation on this
-    checkpoint. DFlash2 is the speculative method here.
+    PARTIAL MTP HEAD: the checkpoint ships 11 of the 15 mtp.* tensors, byte-identical to
+    nvidia/Qwen3.8-27B-NVFP4's. It drops mtp.fc, mtp.norm and mtp.pre_fc_norm_{embedding,hidden}.
+    Atlas needs mtp.fc, so --speculative alone loads no head and serves serially. DFlash2 is
+    the speculative method here. MTP does work if the 4 missing tensors are grafted back
+    from the stock checkpoint, which rebuilds its head exactly (job 154, same env):
+                          DFlash2 (this)   MTP graft (K=3 drafts, bf16)
+      exactness           8/8 x4           8/8 x4 (C1/C8/C1p/C8p == serial)
+      decode-floor        56.1 (acc 5.11)  31.6 (acc 2.88)
+      C1 prose/code/json  29.5/49.7/45.3   25.6/31.3/31.4 tok/s
+      aggregate C1/2/4/8  30.6/48.8/72.1/89.4   25.1/45.9/73.3/100.9 tok/s
+      agentic-webserver   10/10, 5.656 s/turn   10/10, 10.263 s/turn
+      KV blocks           28,041           47,835 (no drafter weights)
+    DFlash2 wins single-stream, through C2 and on agentic turns; the two tie at C4 and MTP leads at C8.
+    sparkrun cannot express the graft, so this recipe stays on DFlash2.
     How Atlas loads it (no engine change needed; see kernels/gb10/qwen3.8-27b/MODEL.toml):
     - GDN layers: NVFP4 in 38 layers; FP8 per-tensor in 10 layers (0-2, 4, 5,
       57, 58, 60-62), which run native FP8 by default.
