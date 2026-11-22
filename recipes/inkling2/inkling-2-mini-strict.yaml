@@ -38,9 +38,8 @@ env:
   ATLAS_DFLASH_ADAPTIVE: "1"
   ATLAS_DFLASH_ADAPTIVE_MIN: "1.2"
 
-distribution:
+distribution_config:
   models:
-    explicit: true
     entries:
       - name: thinkingmachines/Inkling-2-Mini
 

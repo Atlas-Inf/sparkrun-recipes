@@ -38,9 +38,8 @@ env:
   ATLAS_DFLASH_BATCH_DEPTH: "1:7,1000000:0"
   ATLAS_DFLASH_ADAPTIVE: "1"
 
-distribution:
+distribution_config:
   models:
-    explicit: true
     entries:
       - name: thinkingmachines/Inkling-2-Mini
       - name: Enntity/Inkling-2-Mini-Spark-NVFP4
