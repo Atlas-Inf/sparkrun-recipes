@@ -1,0 +1,66 @@
+recipe_version: "2"
+model: thinkingmachines/Inkling-2-Mini
+runtime: atlas
+container: atlas-gb10-local:sha-b13510a
+max_nodes: 1
+metadata:
+  description: |
+    Thinking Machines' Inkling 2 Mini (26.4B total / 3.4B active looped MoE, Apache-2.0) on one GB10 in
+    Strict mode: the checkpoint exactly as shipped (BF16 attention, lm_head and router; NVFP4 experts L0-19,
+    MXFP8 experts L20-23), with the checkpoint's own DSpark drafter and adaptive speculation. Use it when you
+    want the shipped numerics; inkling-2-mini-spark is faster and the recommended default.
+    Credit: the Inkling 2 engine port is Atlas-Inf/atlas#401 by @data-angel (SparkInkling,
+    github.com/Enntity/sparkinkling, which also publishes the overlay); the --weight-overlay / embedded-drafter
+    load path that lets this recipe serve from the HF repos is atlas feat/inkling2-401-sparkrun (b13510a72).
+    Licenses: Inkling 2 Mini is Apache-2.0; Atlas is AGPL-3.0-only.
+    Serves straight from the Hugging Face repos, no manual steps:
+      --draft-model thinkingmachines/Inkling-2-Mini             DSpark = the checkpoint's mtp.safetensors + mtp_config
+      ATLAS_DFLASH_BATCH_DEPTH=1:7,1000000:0                    DSpark speculates for a lone request only
+      ATLAS_DFLASH_ADAPTIVE=1                                   a sequence whose drafts stop paying decodes plainly
+      ATLAS_DFLASH_ADAPTIVE_MIN=TBD                             Strict break-even is lower than the 2.0 default
+    Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7 (not pinned in the recipe: Atlas
+    resolves an HF id offline through refs/main, which a pinned download does not write).
+    MEASURED: TBD (sparky GB10, #401 head c4db7a368).
+    RECIPE VET: TBD.
+    DEPENDS ON Atlas-Inf/atlas#401 + the feat/inkling2-401-sparkrun follow-up merging; the container is a local
+    build of that branch with docker/gb10/Dockerfile until then, and is re-pinned to the post-merge
+    ghcr.io/atlas-inf/atlas-gb10:sha-<merge> image before this recipe merges.
+  maintainer: Atlas
+  category: agent
+  model_params: 26.4B-A3.4B looped MoE (24 physical layers, core 6-17 run three times = 48 visits)
+  model_dtype: nvfp4
+  quantization: "As shipped: NVFP4 experts L0-19, MXFP8 experts L20-23, BF16 attention / lm_head / router"
+  kv_dtype: bf16
+  updated: "2026-11-22"
+
+env:
+  ATLAS_DFLASH_BATCH_DEPTH: "1:7,1000000:0"
+  ATLAS_DFLASH_ADAPTIVE: "1"
+  ATLAS_DFLASH_ADAPTIVE_MIN: "TBD"
+
+distribution:
+  models:
+    explicit: true
+    entries:
+      - name: thinkingmachines/Inkling-2-Mini
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  served_model_name: inkling-2-mini
+  gpu_memory_utilization: 0.80
+  max_model_len: 131072
+  max_num_seqs: 8
+
+command: |
+  spark serve thinkingmachines/Inkling-2-Mini \
+    --host {host} --port {port} --model-name {served_model_name} \
+    --kernel-target inkling-2-mini \
+    --gpu-memory-utilization {gpu_memory_utilization} \
+    --kv-cache-dtype bf16 \
+    --max-num-seqs {max_num_seqs} --max-batch-size {max_num_seqs} \
+    --max-seq-len {max_model_len} --max-prefill-tokens 4096 \
+    --enable-prefix-caching \
+    --dflash --dflash-gamma 8 --num-drafts 7 \
+    --draft-model thinkingmachines/Inkling-2-Mini \
+    --no-tui

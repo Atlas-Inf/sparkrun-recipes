@@ -129,6 +129,13 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 |---|---|---|:---:|---|
 | **DeepSeek-V4** | `deepseek-v4-flash-nvfp4-ep2` | `deepseek-ai/DeepSeek-V4-Flash-NVFP4` | EP=2 (2 Sparks) | Dual-node Expert Parallelism MoE profile |
 
+### 7. Inkling
+
+| Subfamily | Recipe | Model Checkpoint | Topology | Description |
+|---|---|---|:---:|---|
+| **Inkling 2 Mini** | `inkling-2-mini-spark` | `thinkingmachines/Inkling-2-Mini` + `Enntity/Inkling-2-Mini-Spark-NVFP4` | Single GB10 | **Recommended.** 26.4B / 3.4B-active looped MoE, Spark NVFP4 overlay, checkpoint's DSpark drafter + adaptive speculation, prefix caching, BF16 KV. Needs Atlas-Inf/atlas#401 |
+| **Inkling 2 Mini** | `inkling-2-mini-strict` | `thinkingmachines/Inkling-2-Mini` | Single GB10 | The checkpoint exactly as shipped (BF16 attention / lm_head), DSpark + adaptive speculation, prefix caching. Needs Atlas-Inf/atlas#401 |
+
 ---
 
 ## Directory Layout
@@ -165,6 +172,9 @@ recipes/
 ├── diffusion-gemma/
 │   ├── diffusion-gemma-bf16.yaml
 │   └── diffusion-gemma-fp8-dynamic.yaml
+├── inkling2/
+│   ├── inkling-2-mini-spark.yaml
+│   └── inkling-2-mini-strict.yaml
 ├── nemotron-3.5-super-vl/
 │   └── nemotron-3.5-super-vl-120b-a12b-nvfp4-dflash2.yaml
 ├── nemotron-3.5-lightning/
