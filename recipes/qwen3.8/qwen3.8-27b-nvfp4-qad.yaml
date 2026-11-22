@@ -1,0 +1,101 @@
+recipe_version: "2"
+model: nvidia/Qwen3.8-27B-NVFP4-QAD
+runtime: atlas
+container: ghcr.io/atlas-inf/atlas-gb10:sha-269b533
+max_nodes: 1
+metadata:
+  description: |
+    Qwen3.8-27B with NVIDIA's quantization-aware-distilled NVFP4 checkpoint
+    (nvidia/Qwen3.8-27B-NVFP4-QAD) on one GB10. It uses the same exact DFlash2
+    serving profile as qwen3.8-27b-nvfp4-dflash2-exact (output byte-identical to
+    serial decode at every concurrency, up to 64 requests at 262K context), plus
+    one lever, ATLAS_DENSE_NATIVE_FP8_ATTN=1, which keeps every layer in the format
+    the checkpoint stores it in.
+    Credit: SparkQwen (github.com/Enntity/sparkqwen, @data-angel) made this checkpoint
+    its 27B default in sparkqwen#47 (2026-11-20), and its KL study found that serving
+    every layer as stored beats re-rounding attention to NVFP4. This recipe follows
+    that finding. It does not use SparkQwen's TandemLLM NVFP4 overlay.
+    License: the weights are under the NVIDIA Open Model Agreement; check it before use.
+    PARTIAL MTP HEAD: the checkpoint ships 11 of the 15 mtp.* tensors, byte-identical to
+    nvidia/Qwen3.8-27B-NVFP4's. It drops mtp.fc, mtp.norm and mtp.pre_fc_norm_{embedding,hidden}.
+    Atlas needs mtp.fc, so --speculative alone loads no head and serves serially. DFlash2 is
+    the speculative method here. MTP does work if the 4 missing tensors are grafted back
+    from the stock checkpoint, which rebuilds its head exactly (job 154, same env):
+                          DFlash2 (this)   MTP graft (K=3 drafts, bf16)
+      exactness           8/8 x4           8/8 x4 (C1/C8/C1p/C8p == serial)
+      decode-floor        56.1 (acc 5.11)  31.6 (acc 2.88)
+      C1 prose/code/json  29.5/49.7/45.3   25.6/31.3/31.4 tok/s
+      aggregate C1/2/4/8  30.6/48.8/72.1/89.4   25.1/45.9/73.3/100.9 tok/s
+      agentic-webserver   10/10, 5.656 s/turn   10/10, 10.263 s/turn
+      KV blocks           28,041           47,835 (no drafter weights)
+    DFlash2 wins single-stream, through C2 and on agentic turns; the two tie at C4 and MTP leads at C8.
+    sparkrun cannot express the graft, so this recipe stays on DFlash2.
+    How Atlas loads it (no engine change needed; see kernels/gb10/qwen3.8-27b/MODEL.toml):
+    - GDN layers: NVFP4 in 38 layers; FP8 per-tensor in 10 layers (0-2, 4, 5,
+      57, 58, 60-62), which run native FP8 by default.
+    - Attention q/k/v/o: FP8 per-tensor. Atlas re-rounds them to NVFP4 unless
+      ATLAS_DENSE_NATIVE_FP8_ATTN=1 is set.
+    - config.json's kv_cache_scheme (static FP8, no scales) is not read; KV is BF16.
+    MEASURED (sparky GB10, 2026-11-21, job 152): main 269b533bc built natively, the
+      dflash2-exact env and flags, one variable at a time. Arms: N = nvidia/Qwen3.8-27B-NVFP4
+      (old checkpoint); Q = QAD, attention re-rounded to NVFP4; QN = QAD, attention
+      FP8 as stored (this recipe).
+                          N        Q        QN
+      bfcl-subset       88.74    88.14    89.25   overall (ST-995, n=995)
+                        88.96    88.22    89.73   normalized
+      agentic s/turn    6.608    5.554    5.656   webserver 10/10 / 10/10 in all three
+      engine NLL        0.85200  0.83482  0.82863  48,264 tok; QN lower than N in 29/32
+                                                  chunks, lower than Q in 27/32
+      decode-floor      57.9     (64.1)   56.0    tok/s, server median; accept 5.57 / - / 5.11
+      decode-floor output tokens differ by arm (1096 / 520 / 871), so its tok/s is not a
+      like-for-like speed comparison. Q's 520-token answer is under the gate's 700-token
+      floor, so its verdict is INCONCLUSIVE.
+      exactness   greedy_eq DFlash2 == own serial decode 8/8 at C1, C8, C1 prefix and C8 prefix,
+                  in every arm; engine NLL serial == DFlash2 (32/32 ties) in every arm.
+      probes      tools 21/21, arith 40/40, needle 12/12 (QN); 0 serve ERROR/panic lines.
+    The ST-995 gaps are about one standard error (~1.0 pt at n=995). The paired NLL is the
+    firmer signal for the quality ranking.
+    RECIPE VET (this file through sparkrun on sha-269b533, sparky, 2026-11-21, job 153): the image and
+      ATLAS_DENSE_NATIVE_FP8_ATTN took effect (loader logs native FP8 attention and native FP8 GDN in
+      layers 0-2/4/5/57/58/60-62; KV 28,041 blocks). greedy_eq DFlash2 == the recipe's own serial decode
+      8/8 at C1/C8 plain and prefix; decode-floor 56.1 (accept 5.11, run-1795271754085642090);
+      agentic-webserver 10/10 / 10/10, 5.956 s/turn, sum wall 550 s (run-1795272305924302681);
+      bfcl-subset 89.25 / 89.73 (run-1795279159343314361, identical to the native-build arm);
+      0 serve ERROR/panic lines.
+    request_timeout 1800, KV overcommit at 262K x 64, and "keep speculation ON": as in
+    qwen3.8-27b-nvfp4-dflash2-exact.
+  maintainer: Atlas
+  category: agent
+  model_params: 27B dense hybrid (48 GDN linear-attn + 16 softmax-attn layers)
+  model_dtype: nvfp4
+  quantization: "NVFP4 QAD (mixed precision: NVFP4 MLP + 38 GDN layers, FP8 attention + 10 GDN layers, all served as stored)"
+  kv_dtype: bf16
+  updated: "2026-11-21"
+
+env:
+  ATLAS_EXACT_VERIFY: "1"
+  ATLAS_SKINNY_MMA: "1"
+  ATLAS_QWEN38_PDL: "1"
+  ATLAS_QWEN38_DECODE_FUSE: "1"
+  ATLAS_QWEN38_VERIFY_FUSE: "1"
+  ATLAS_QWEN38_VERIFY_DEFER: "1"
+  ATLAS_GDN_CHUNK_TC: "1"
+  ATLAS_DENSE_PREFILL_BF16MMA: "1"
+  ATLAS_DENSE_PREFILL_LOWP: "1"
+  ATLAS_DECODE_TIME_SHARE: "0.3"
+  ATLAS_MTP_GATE_FORCE: "1"
+  ATLAS_ATTN_SHARED_SCAN: "1"
+  ATLAS_DENSE_NATIVE_FP8_ATTN: "1"
+
+defaults:
+  host: 0.0.0.0
+  port: 8888
+  max_model_len: 262144
+  max_num_seqs: 64
+  max_batch_size: 64
+  kv_cache_dtype: bf16
+  enable_prefix_caching: true
+  dflash: true
+  draft_model: incoai/Qwen3.8-27B-DFlash2
+  dflash_gamma: 8
+  request_timeout: 1800

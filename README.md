@@ -49,6 +49,7 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 |---|---|:---:|---|
 | `qwen3.8-27b-nvfp4` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | **DEFAULT FLAGSHIP**. 27B dense hybrid GDN + attention, NVFP4, MTP speculative decoding, FP8 KV cache, 23.59 tok/s single-stream |
 | `qwen3.8-27b-nvfp4-concurrency` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | Concurrency profile measured to beat vLLM from 1 to 128 streams on GB10 |
+| `qwen3.8-27b-nvfp4-qad` | `nvidia/Qwen3.8-27B-NVFP4-QAD` | Single GB10 | NVIDIA's QAD checkpoint (SparkQwen's 27B default), every layer served as stored, exact DFlash2 at 64 seqs / 262K, BF16 KV. ST-995 89.25 vs 88.74 on the stock checkpoint, 5.66 vs 6.61 s/turn agentic. The export drops 4 MTP-head tensors, so MTP needs a graft; DFlash2 is faster to C2 |
 | `qwen3.8-flash-next-nvfp4` | `nvidia/Qwen3.8-Flash-Next-NVFP4` | Single GB10 | ~180B hybrid MoE on the vendor ModelOpt pack, 32K context / 8K chunked prefill, BF16 KV, MTP K=1, 47.7 GB PLE n-gram parallel `pread` NVMe offload (util 0.90 — the measured ceiling on the unified 128 GB) |
 | `qwen3.8-27b-nvfp4-agentic` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | Agentic gate config: thinking ON, BF16 head + BF16 KV, 32K context, MTP K=4, SLAi scheduler |
 | `qwen3.8-27b-nvfp4-bfcl` | `nvidia/Qwen3.8-27B-NVFP4` | Single GB10 | BFCL v4 agentic tool-use benchmark profile (its bars are tied to this exact config; do not add serve overrides) |
@@ -140,6 +141,7 @@ recipes/
 │   ├── qwen3.8-27b-nvfp4-concurrency.yaml
 │   ├── qwen3.8-27b-nvfp4-bfcl.yaml
 │   ├── qwen3.8-27b-nvfp4-dflash2.yaml
+│   ├── qwen3.8-27b-nvfp4-qad.yaml
 │   └── qwen3.8-flash-next-nvfp4.yaml
 ├── qwen3.6/
 │   ├── qwen3.6-35b-a3b-fp8-mtp.yaml
