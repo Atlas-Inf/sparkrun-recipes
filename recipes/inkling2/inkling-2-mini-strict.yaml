@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: thinkingmachines/Inkling-2-Mini
 runtime: atlas
-container: atlas-gb10-local:sha-b13510a
+container: atlas-gb10-local:sha-c94c7c1
 max_nodes: 1
 metadata:
   description: |
@@ -11,7 +11,7 @@ metadata:
     want the shipped numerics; inkling-2-mini-spark is faster and the recommended default.
     Credit: the Inkling 2 engine port is Atlas-Inf/atlas#401 by @data-angel (SparkInkling,
     github.com/Enntity/sparkinkling, which also publishes the overlay); the --weight-overlay / embedded-drafter
-    load path that lets this recipe serve from the HF repos is atlas feat/inkling2-401-sparkrun (b13510a72).
+    load path that lets this recipe serve from the HF repos is atlas feat/inkling2-401-sparkrun (c94c7c1c6).
     Licenses: Inkling 2 Mini is Apache-2.0; Atlas is AGPL-3.0-only.
     Serves straight from the Hugging Face repos, no manual steps:
       --draft-model thinkingmachines/Inkling-2-Mini             DSpark = the checkpoint's mtp.safetensors + mtp_config
@@ -20,7 +20,7 @@ metadata:
       ATLAS_DFLASH_ADAPTIVE_MIN=1.2                             Strict break-even is lower than the 2.0 default
     Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7 (not pinned in the recipe: Atlas
     resolves an HF id offline through refs/main, which a pinned download does not write).
-    MEASURED: TBD (sparky GB10, #401 head c4db7a368).
+    MEASURED: TBD (sparky GB10, #401 head e6a8a0420).
     RECIPE VET: TBD.
     DEPENDS ON Atlas-Inf/atlas#401 + the feat/inkling2-401-sparkrun follow-up merging; the container is a local
     build of that branch with docker/gb10/Dockerfile until then, and is re-pinned to the post-merge
