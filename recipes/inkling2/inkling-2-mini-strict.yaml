@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: thinkingmachines/Inkling-2-Mini
 runtime: atlas
-container: atlas-gb10-local:sha-c94c7c1
+container: ghcr.io/atlas-inf/atlas-gb10:sha-61661e2
 max_nodes: 1
 metadata:
   description: |
@@ -11,7 +11,7 @@ metadata:
     want the shipped numerics; inkling-2-mini-spark is faster and the recommended default.
     Credit: the Inkling 2 engine port is Atlas-Inf/atlas#401 by @data-angel (SparkInkling,
     github.com/Enntity/sparkinkling, which also publishes the overlay); the --weight-overlay / embedded-drafter
-    load path that lets this recipe serve from the HF repos is atlas feat/inkling2-401-sparkrun (c94c7c1c6).
+    load path that lets this recipe serve from the HF repos is Atlas-Inf/atlas#406.
     Licenses: Inkling 2 Mini is Apache-2.0; Atlas is AGPL-3.0-only.
     Serves straight from the Hugging Face repos, no manual steps:
       --draft-model thinkingmachines/Inkling-2-Mini             DSpark = the checkpoint's mtp.safetensors + mtp_config
@@ -20,18 +20,20 @@ metadata:
       ATLAS_DFLASH_ADAPTIVE_MIN=1.2                             Strict break-even is lower than the 2.0 default
     Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7 (not pinned in the recipe: Atlas
     resolves an HF id offline through refs/main, which a pinned download does not write).
-    MEASURED: TBD (sparky GB10, #401 head e6a8a0420).
-    RECIPE VET: TBD.
-    DEPENDS ON Atlas-Inf/atlas#401 + the feat/inkling2-401-sparkrun follow-up merging; the container is a local
-    build of that branch with docker/gb10/Dockerfile until then, and is re-pinned to the post-merge
-    ghcr.io/atlas-inf/atlas-gb10:sha-<merge> image before this recipe merges.
+    MEASURED (sparky GB10, #401 head e6a8a0420 = main's engine; job 175, prefix cache on, reasoning low): C1 decode
+      prose/code/json 36.2/37.5/35.2 tok/s; aggregate C1/C2/C4/C8 36.5/51.9/75.7/107.0 tok/s; ~41K tok cold prefill
+      3,437-3,469 tok/s (strict serial arm); agentic-webserver x10 10/10, 6.50 s/turn. ST-995 79.30 overall / 79.98 normalized (job 165, db19431be).
+    RECIPE VET (sparkrun on this image, sha256:dd1f81ed3fd3, revision 61661e2d3): job 184: checkpoint drafter, prefix
+      cache on; tools 14/14, arith 40/40, needle 11/12, cache hit == cold 6/6, greedy C1 8/8 identical to the job-176
+      vet, 0 ERROR/panic. Job 176: poisoning gate 0 collapsed, agentic 9/10 (one /ping timeout) 5.98 s/turn.
+    Needs Atlas main 61661e2d3 or later (#401 + #406), which this image is.
   maintainer: Atlas
   category: agent
   model_params: 26.4B-A3.4B looped MoE (24 physical layers, core 6-17 run three times = 48 visits)
   model_dtype: nvfp4
   quantization: "As shipped: NVFP4 experts L0-19, MXFP8 experts L20-23, BF16 attention / lm_head / router"
   kv_dtype: bf16
-  updated: "2026-11-22"
+  updated: "2026-11-23"
 
 env:
   ATLAS_DFLASH_BATCH_DEPTH: "1:7,1000000:0"

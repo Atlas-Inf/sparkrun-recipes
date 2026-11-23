@@ -16,6 +16,9 @@ sparkrun run @atlas/nemotron-3.5-lightning-30b-a3b-nvfp4-dspark --hosts localhos
 # Qwen 3.8 27B low-latency dense hybrid
 sparkrun run @atlas/qwen3.8-27b-nvfp4 --hosts localhost
 
+# Inkling 2 Mini (Thinking Machines, 26B / 3.4B-active looped MoE)
+sparkrun run @atlas/inkling-2-mini-spark --hosts localhost
+
 # Multi-node Expert Parallelism across 2 Sparks (EP=2)
 sparkrun run @atlas/deepseek-v4-flash-nvfp4-ep2 --hosts <spark-1>,<spark-2>
 ```
@@ -133,8 +136,8 @@ The recipe catalogue mirrors the structure and prioritization on [atlasinference
 
 | Subfamily | Recipe | Model Checkpoint | Topology | Description |
 |---|---|---|:---:|---|
-| **Inkling 2 Mini** | `inkling-2-mini-spark` | `thinkingmachines/Inkling-2-Mini` + `Enntity/Inkling-2-Mini-Spark-NVFP4` | Single GB10 | **Recommended.** 26.4B / 3.4B-active looped MoE, Spark NVFP4 overlay, checkpoint's DSpark drafter + adaptive speculation, prefix caching, BF16 KV. Needs Atlas-Inf/atlas#401 |
-| **Inkling 2 Mini** | `inkling-2-mini-strict` | `thinkingmachines/Inkling-2-Mini` | Single GB10 | The checkpoint exactly as shipped (BF16 attention / lm_head), DSpark + adaptive speculation, prefix caching. Needs Atlas-Inf/atlas#401 |
+| **Inkling 2 Mini** | `inkling-2-mini-spark` | `thinkingmachines/Inkling-2-Mini` + `Enntity/Inkling-2-Mini-Spark-NVFP4` | Single GB10 | **Recommended.** 26.4B / 3.4B-active looped MoE, Spark NVFP4 overlay, checkpoint's DSpark drafter + adaptive speculation, prefix caching, BF16 KV |
+| **Inkling 2 Mini** | `inkling-2-mini-strict` | `thinkingmachines/Inkling-2-Mini` | Single GB10 | The checkpoint exactly as shipped (BF16 attention / lm_head), DSpark + adaptive speculation, prefix caching |
 
 ---
 

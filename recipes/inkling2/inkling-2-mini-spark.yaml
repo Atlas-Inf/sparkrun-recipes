@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: thinkingmachines/Inkling-2-Mini
 runtime: atlas
-container: atlas-gb10-local:sha-c94c7c1
+container: ghcr.io/atlas-inf/atlas-gb10:sha-61661e2
 max_nodes: 1
 metadata:
   description: |
@@ -11,7 +11,7 @@ metadata:
     checkpoint), the checkpoint's own DSpark drafter, and adaptive speculation. The recommended Inkling recipe.
     Credit: the Inkling 2 engine port is Atlas-Inf/atlas#401 by @data-angel (SparkInkling,
     github.com/Enntity/sparkinkling, which also publishes the overlay); the --weight-overlay / embedded-drafter
-    load path that lets this recipe serve from the HF repos is atlas feat/inkling2-401-sparkrun (c94c7c1c6).
+    load path that lets this recipe serve from the HF repos is Atlas-Inf/atlas#406.
     Licenses: Inkling 2 Mini and the Spark overlay are Apache-2.0; Atlas is AGPL-3.0-only.
     Serves straight from the Hugging Face repos, no manual steps:
       --weight-overlay Enntity/Inkling-2-Mini-Spark-NVFP4       overlay tensors added under their own names
@@ -21,18 +21,22 @@ metadata:
     Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7,
     Enntity/Inkling-2-Mini-Spark-NVFP4 e9df93dceea2fbf0927caf178104e868452a6292 (not pinned in the recipe: Atlas
     resolves an HF id offline through refs/main, which a pinned download does not write).
-    MEASURED: TBD (sparky GB10, #401 head e6a8a0420).
-    RECIPE VET: TBD.
-    DEPENDS ON Atlas-Inf/atlas#401 + the feat/inkling2-401-sparkrun follow-up merging; the container is a local
-    build of that branch with docker/gb10/Dockerfile until then, and is re-pinned to the post-merge
-    ghcr.io/atlas-inf/atlas-gb10:sha-<merge> image before this recipe merges.
+    MEASURED (sparky GB10, #401 head e6a8a0420 = main's engine; job 175, prefix cache on, reasoning low): C1 decode
+      prose/code/json 55.6/58.9/54.7 tok/s; aggregate C1/C2/C4/C8 54.5/72.4/95.0/123.0 tok/s; cold prefill 5,946 tok
+      1.91 s, 20,824 tok 6.17 s, ~41K tok 3,333-3,367 tok/s; agentic-webserver x10 10/10, 5.04 s/turn. ST-995 (bfcl-subset,
+      MLPerf ST leg) 80.00 overall / 80.34 normalized (job 165, db19431be).
+    RECIPE VET (sparkrun on this image, sha256:dd1f81ed3fd3, revision 61661e2d3; overlay refs/main deleted first, so the
+      recipe's own sync restored it): job 184: 459 overlay tensors, checkpoint drafter, prefix cache on; tools 14/14,
+      arith 40/40, needle 11/12, cache hit == cold 6/6, greedy C1 8/8 identical to the job-178 vet, 0 ERROR/panic.
+      Job 178 (same recipe, local build of the merged code): poisoning gate 0 collapsed, agentic 10/10 5.56 s/turn.
+    Needs Atlas main 61661e2d3 or later (#401 + #406), which this image is.
   maintainer: Atlas
   category: agent
   model_params: 26.4B-A3.4B looped MoE (24 physical layers, core 6-17 run three times = 48 visits)
   model_dtype: nvfp4
   quantization: "NVFP4 experts L0-19 + MXFP8 experts L20-23 (checkpoint) with the Spark NVFP4 overlay over attention, lm_head and L20-23 experts"
   kv_dtype: bf16
-  updated: "2026-11-22"
+  updated: "2026-11-23"
 
 env:
   ATLAS_DFLASH_BATCH_DEPTH: "1:7,1000000:0"
