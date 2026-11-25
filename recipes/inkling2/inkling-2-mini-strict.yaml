@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: thinkingmachines/Inkling-2-Mini
 runtime: atlas
-container: ghcr.io/atlas-inf/atlas-gb10:sha-61661e2
+container: ghcr.io/atlas-inf/atlas-gb10:sha-bc0c3a3
 max_nodes: 1
 metadata:
   description: |
@@ -22,20 +22,20 @@ metadata:
       ATLAS_MTP_GATE_FORCE=1                                    the depth gate always drafts at C1 (atlas#408 release)
     Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7 (not pinned in the recipe: Atlas
     resolves an HF id offline through refs/main, which a pinned download does not write).
-    MEASURED (sparky GB10, #401 head e6a8a0420 = main's engine; job 175, prefix cache on, reasoning low): C1 decode
-      prose/code/json 36.2/37.5/35.2 tok/s; aggregate C1/C2/C4/C8 36.5/51.9/75.7/107.0 tok/s; ~41K tok cold prefill
-      3,437-3,469 tok/s (strict serial arm); agentic-webserver x10 10/10, 6.50 s/turn. ST-995 79.30 overall / 79.98 normalized (job 165, db19431be).
-    RECIPE VET (sparkrun on this image, sha256:dd1f81ed3fd3, revision 61661e2d3): job 184: checkpoint drafter, prefix
-      cache on; tools 14/14, arith 40/40, needle 11/12, cache hit == cold 6/6, greedy C1 8/8 identical to the job-176
-      vet, 0 ERROR/panic. Job 176: poisoning gate 0 collapsed, agentic 9/10 (one /ping timeout) 5.98 s/turn.
-    Needs Atlas main 61661e2d3 or later (#401 + #406), which this image is.
+    MEASURED (sparky GB10, this image = Atlas main bc0c3a34b, sparkrun with this recipe; job 201, prefix cache on, reasoning low):
+      C1 decode prose/code/json 37.1/59.7/37.7 tok/s; aggregate C1/C2/C4/C8 38.5/56.5/76.6/110.8 tok/s. The same engine with the
+      previous env (depth 1:7,1000000:0): code 35.6, json 34.0 (atlas#421 gate).
+    RECIPE VET (sparkrun on this image, sha256:f362064e49dd, revision bc0c3a3): job 201: tools 14/14, arith 40/40, needle 11/12,
+      cache hit == cold 6/6, agentic-webserver x10 9/10 4.64 s/turn (one run wrote no Cargo.toml), 0 ERROR/panic; drafted greedy
+      text == plain decode in this image 8/8.
+    Needs Atlas main bc0c3a34b or later (atlas#408 for CONF_WIDTH and the pair depth), which this image is.
   maintainer: Atlas
   category: agent
   model_params: 26.4B-A3.4B looped MoE (24 physical layers, core 6-17 run three times = 48 visits)
   model_dtype: nvfp4
   quantization: "As shipped: NVFP4 experts L0-19, MXFP8 experts L20-23, BF16 attention / lm_head / router"
   kv_dtype: bf16
-  updated: "2026-11-23"
+  updated: "2026-11-25"
 
 env:
   ATLAS_DFLASH_BATCH_DEPTH: "1:7,2:2,1000000:0"
