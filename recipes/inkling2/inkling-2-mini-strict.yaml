@@ -15,9 +15,11 @@ metadata:
     Licenses: Inkling 2 Mini is Apache-2.0; Atlas is AGPL-3.0-only.
     Serves straight from the Hugging Face repos, no manual steps:
       --draft-model thinkingmachines/Inkling-2-Mini             DSpark = the checkpoint's mtp.safetensors + mtp_config
-      ATLAS_DFLASH_BATCH_DEPTH=1:7,1000000:0                    DSpark speculates for a lone request only
+      ATLAS_DFLASH_BATCH_DEPTH=1:7,2:2,1000000:0                seven drafts alone, two each for a pair (atlas#408), none past two
       ATLAS_DFLASH_ADAPTIVE=1                                   a sequence whose drafts stop paying decodes plainly
       ATLAS_DFLASH_ADAPTIVE_MIN=1.2                             Strict break-even is lower than the 2.0 default
+      ATLAS_DFLASH_CONF_WIDTH=1                                 a verify stops where the drafter is unsure (atlas#408)
+      ATLAS_MTP_GATE_FORCE=1                                    the depth gate always drafts at C1 (atlas#408 release)
     Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7 (not pinned in the recipe: Atlas
     resolves an HF id offline through refs/main, which a pinned download does not write).
     MEASURED (sparky GB10, #401 head e6a8a0420 = main's engine; job 175, prefix cache on, reasoning low): C1 decode
@@ -36,9 +38,11 @@ metadata:
   updated: "2026-11-23"
 
 env:
-  ATLAS_DFLASH_BATCH_DEPTH: "1:7,1000000:0"
+  ATLAS_DFLASH_BATCH_DEPTH: "1:7,2:2,1000000:0"
   ATLAS_DFLASH_ADAPTIVE: "1"
   ATLAS_DFLASH_ADAPTIVE_MIN: "1.2"
+  ATLAS_DFLASH_CONF_WIDTH: "1"
+  ATLAS_MTP_GATE_FORCE: "1"
 
 distribution_config:
   models:
