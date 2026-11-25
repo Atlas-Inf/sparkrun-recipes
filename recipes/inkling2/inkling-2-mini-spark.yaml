@@ -1,7 +1,7 @@
 recipe_version: "2"
 model: thinkingmachines/Inkling-2-Mini
 runtime: atlas
-container: ghcr.io/atlas-inf/atlas-gb10:sha-bc0c3a3
+container: ghcr.io/atlas-inf/atlas-gb10:sha-b08e214
 max_nodes: 1
 metadata:
   description: |
@@ -15,24 +15,22 @@ metadata:
     Licenses: Inkling 2 Mini and the Spark overlay are Apache-2.0; Atlas is AGPL-3.0-only.
     Serves straight from the Hugging Face repos, no manual steps:
       --weight-overlay Enntity/Inkling-2-Mini-Spark-NVFP4       overlay tensors added under their own names
-      --draft-model thinkingmachines/Inkling-2-Mini             DSpark = the checkpoint's mtp.safetensors + mtp_config
+      --draft-model incoai/Inkling-2-Mini-DFlash2               incoai's DFlash2 drafter (atlas#427; DSpark: thinkingmachines/Inkling-2-Mini)
       ATLAS_DFLASH_BATCH_DEPTH=1:7,1000000:0                    DSpark speculates for a lone request only
       ATLAS_DFLASH_ADAPTIVE=1                                   a sequence whose drafts stop paying decodes plainly
-      ATLAS_DFLASH_ADAPTIVE_MIN=2.5                             Spark break-even (atlas#408's release setting)
       ATLAS_DFLASH_CONF_WIDTH=1                                 a verify stops where the drafter is unsure (atlas#408)
       ATLAS_MTP_GATE_FORCE=1                                    the depth gate always drafts at C1 (atlas#408 release)
     Tested revisions: thinkingmachines/Inkling-2-Mini ed40e7da625f594fc9c4990f5f66be24873c22d7,
     Enntity/Inkling-2-Mini-Spark-NVFP4 e9df93dceea2fbf0927caf178104e868452a6292 (not pinned in the recipe: Atlas
     resolves an HF id offline through refs/main, which a pinned download does not write).
-    MEASURED (sparky GB10, this image = Atlas main bc0c3a34b, sparkrun with this recipe; job 201, prefix cache on, reasoning low):
-      C1 decode prose/code/json 57.6/72.2/57.8 tok/s; aggregate C1/C2/C4/C8 56.1/72.4/96.1/119.7 tok/s. The same engine with the
-      previous env (depth only): code 55.9, json 53.5 (atlas#421 gate). ST-995 (bfcl-subset, MLPerf ST leg) 80.40 overall /
-      81.16 normalized on the train's native build (atlas#421, job 187).
-    RECIPE VET (sparkrun on this image, sha256:f362064e49dd, revision bc0c3a3): job 201: tools 14/14, arith 40/40, needle 11/12,
-      cache hit == cold 6/6, 0 ERROR/panic. Job 202, agentic-webserver x20: 19/20, 4.80 s/turn, against 19/20, 5.41 s/turn with
-      the previous env on the same image (the same iteration fails under both). Drafted text == plain decode text (atlas#408;
-      in this image at C1/C2, job 199b).
-    Needs Atlas main bc0c3a34b or later (atlas#408 for CONF_WIDTH and the pair depth), which this image is.
+    MEASURED (sparky GB10, this image = Atlas main b08e21445, sparkrun with this recipe; job 207, prefix cache on, reasoning low):
+      C1 decode prose/code/json 58.0/81.7/68.0 tok/s; aggregate C1/C2/C4/C8 61.2/72.0/95.9/119.4 tok/s. With the checkpoint's DSpark
+      drafter and atlas#408's settings on main bc0c3a34b: 57.6/72.2/57.8 (job 201). ST-995 (bfcl-subset, MLPerf ST leg) 80.40 overall /
+      81.16 normalized with DSpark (atlas#421, job 187).
+    RECIPE VET (sparkrun on this image, sha256:26db00ece65f, revision b08e214): job 207: tools 14/14, arith 40/40, needle 11/12,
+      cache hit == cold 6/6, agentic-webserver x10 9/10 4.76 s/turn (the run that writes no Cargo.toml, which fails under every
+      drafter setting: job 202, x20 19/20 with DSpark old and new), 0 ERROR/panic. Drafted text == plain decode (atlas#427, job 206b).
+    Needs Atlas main b08e21445 or later (atlas#427 for this drafter, atlas#408 for CONF_WIDTH), which this image is.
   maintainer: Atlas
   category: agent
   model_params: 26.4B-A3.4B looped MoE (24 physical layers, core 6-17 run three times = 48 visits)
@@ -44,7 +42,6 @@ metadata:
 env:
   ATLAS_DFLASH_BATCH_DEPTH: "1:7,1000000:0"
   ATLAS_DFLASH_ADAPTIVE: "1"
-  ATLAS_DFLASH_ADAPTIVE_MIN: "2.5"
   ATLAS_DFLASH_CONF_WIDTH: "1"
   ATLAS_MTP_GATE_FORCE: "1"
 
@@ -52,6 +49,7 @@ distribution_config:
   models:
     entries:
       - name: thinkingmachines/Inkling-2-Mini
+      - name: incoai/Inkling-2-Mini-DFlash2
       - name: Enntity/Inkling-2-Mini-Spark-NVFP4
 
 defaults:
@@ -73,5 +71,5 @@ command: |
     --enable-prefix-caching \
     --weight-overlay Enntity/Inkling-2-Mini-Spark-NVFP4 \
     --dflash --dflash-gamma 8 --num-drafts 7 \
-    --draft-model thinkingmachines/Inkling-2-Mini \
+    --draft-model incoai/Inkling-2-Mini-DFlash2 \
     --no-tui
